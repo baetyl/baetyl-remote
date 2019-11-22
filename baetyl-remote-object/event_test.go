@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -22,7 +21,6 @@ func TestNewEvent(t *testing.T) {
 	}
 	d, err := json.Marshal(e)
 	assert.NoError(t, err)
-	fmt.Println(string(d))
 	got, err := NewEvent(d)
 	assert.NoError(t, err)
 	u, ok := got.Content.(*UploadEvent)
@@ -31,4 +29,11 @@ func TestNewEvent(t *testing.T) {
 	assert.Equal(t, "aaa", u.LocalPath)
 	assert.True(t, u.Zip)
 	assert.Equal(t, "x1", u.Meta["x"])
+
+	e.Type = "TEST"
+	d, err = json.Marshal(e)
+	assert.Nil(t, err)
+	got, err = NewEvent(d)
+	assert.Nil(t, got)
+	assert.Equal(t, "event type unexpected", err.Error())
 }

@@ -15,17 +15,18 @@ clients:
       worker: 1000
       idletime: 30s
     bucket: bos-remote-demo
-    temppath: var/db/baetyl/tmp
+    temppath: var/lib/baetyl/tmp
     # max 1000g
     limit:
-      switch: true
+      enable: true
       data: 9g
-      path: var/db/baetyl/data/stats.yml
+      path: var/lib/baetyl/data/stats.yml
 rules:
-  - clientid: remote-write-bos
-    subscribe:
-      # hub topic
-      topic: t
+  - hub:
+      clientid: remote-write-bos
+      subscriptions:
+        # hub topic
+        - topic: t
     client:
       name: baidu-bos
 logger:

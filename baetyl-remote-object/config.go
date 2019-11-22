@@ -22,12 +22,11 @@ const (
 // Config config of module
 type Config struct {
 	Clients []ClientInfo `yaml:"clients" json:"clients" default:"[]"`
-	Rules   []RuleInfo   `yaml:"rules" json:"rules" default:"[]"`
-	Storage Storage      `yaml:"storage" json:"storage"`
+	Rules   []Rule       `yaml:"rules" json:"rules" default:"[]"`
 }
 
-// Retry policy
-type Retry struct {
+// Backoff policy
+type Backoff struct {
 	Max   int           `yaml:"max" json:"max" default:"0"`       // retry max
 	Delay time.Duration `yaml:"delay" json:"delay" default:"20s"` // delay time
 	Base  time.Duration `yaml:"base" json:"base" default:"0.3s"`  // base time & *2
@@ -48,10 +47,10 @@ type ClientInfo struct {
 	Sk        string        `yaml:"sk" json:"sk" validate:"nonzero"`
 	Kind      Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
 	Timeout   time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
-	Retry     Retry         `yaml:"retry" json:"retry"`
+	Backoff   Backoff       `yaml:"backoff" json:"backoff"`
 	Pool      Pool          `yaml:"pool" json:"pool"`
 	Bucket    string        `yaml:"bucket" json:"bucket" validate:"nonzero"`
-	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/db/baetyl/tmp"`
+	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
 	MultiPart MultiPart     `yaml:"multipart" json:"multipart"`
 	Limit     Limit         `yaml:"limit" json:"limit"`
 	Report    struct {
@@ -59,11 +58,13 @@ type ClientInfo struct {
 	} `yaml:"report" json:"report"`
 }
 
-// RuleInfo function rule config
-type RuleInfo struct {
-	ClientID  string         `yaml:"clientid" json:"clientid"`
-	Subscribe mqtt.TopicInfo `yaml:"subscribe" json:"subscribe"`
-	Client    struct {
+// Rule function rule config
+type Rule struct {
+	Hub struct {
+		ClientID      string           `yaml:"clientid" json:"clientid"`
+		Subscriptions []mqtt.TopicInfo `yaml:"subscriptions" json:"subscriptions" default:"[]"`
+	} `yaml:"hub" json:"hub"`
+	Client struct {
 		Name string `yaml:"name" json:"name" validate:"nonzero"`
 	} `yaml:"client" json:"client"`
 }
@@ -81,14 +82,15 @@ type multipart struct {
 
 // Limit limit config
 type Limit struct {
-	Switch bool   `yaml:"switch" json:"switch" default:"false"`
-	Data   int64  `yaml:"data" json:"data" default:"1g"`
-	Path   string `yaml:"path" json:"path" default:"var/db/baetyl/data/stats.yml"`
+	Enable bool   `yaml:"enable" json:"enable" default:"false"`
+	Data   int64  `yaml:"data" json:"data" default:"1073741824"`
+	Path   string `yaml:"path" json:"path" default:"var/lib/baetyl/data/stats.yml"`
 }
 
 type limit struct {
-	Data string `yaml:"data" json:"data"`
-	Path string `yaml:"path" json:"path"`
+	Enable bool   `yaml:"enable" json:"enable"`
+	Data   string `yaml:"data" json:"data"`
+	Path   string `yaml:"path" json:"path"`
 }
 
 // UnmarshalYAML customizes unmarshal
@@ -97,6 +99,9 @@ func (l *Limit) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	err := unmarshal(&ls)
 	if err != nil {
 		return err
+	}
+	if ls.Enable {
+		l.Enable = ls.Enable
 	}
 	if ls.Data != "" {
 		l.Data, err = units.RAMInBytes(ls.Data)
@@ -131,8 +136,8 @@ func (m *MultiPart) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 // Item data count
 type Item struct {
-	Bytes int64 `yaml:"bytes" json:"bytes" default:"0"`
-	Count int64 `yaml:"count" json:"count" default:"0"`
+	Bytes int64 `yaml:"bytes" json:"bytes"`
+	Count int64 `yaml:"count" json:"count"`
 }
 
 // Stats month stats
@@ -152,9 +157,4 @@ func DumpYAML(path string, in interface{}) error {
 		return err
 	}
 	return nil
-}
-
-// Storage storage the failed object message
-type Storage struct {
-	Dir string `yaml:"dir" json:"dir" default:"var/db/baetyl/data"`
 }

@@ -115,38 +115,34 @@ func (cli *StorageClient) call(task interface{}) {
 
 // upload upload object to service(BOS, CEPH or AWS S3)
 func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) error {
-	fi, err := os.Stat(f)
-	if err != nil {
-		cli.log.Errorf("failed to get file info: %s", err.Error())
-		return nil
-	}
-	fsize := fi.Size()
-	md5, err := utils.CalculateFileMD5(f)
-	if err != nil {
-		cli.log.Errorf("failed to calculate file[%s] MD5: %s", f, err.Error())
-		return nil
-	}
+	fsize, md5 := cli.fileSizeMd5(f)
 	saved := cli.checkFile(remotePath, md5)
 	if saved {
 		return nil
 	}
-	if cli.cfg.Limit.Switch {
+	if cli.cfg.Limit.Enable {
 		month := time.Unix(0, time.Now().UnixNano()).Format("2006-01")
-		err = cli.checkData(fsize, month)
+		err := cli.checkData(fsize, month)
 		if err != nil {
 			cli.log.Errorf("failed to pass data check: %s", err.Error())
 			atomic.AddUint64(&cli.fs.limit, 1)
 			return nil
 		}
-		err = cli.sh.PutObjectFromFile(cli.cfg.Bucket, remotePath, f, meta)
+		err = cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
 		if err != nil {
-			atomic.AddUint64(&cli.fs.fail, 1)
 			return err
 		}
-		atomic.AddUint64(&cli.fs.success, 1)
 		return cli.increaseData(fsize, month)
 	}
-	err = cli.sh.PutObjectFromFile(cli.cfg.Bucket, remotePath, f, meta)
+	err := cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (cli *StorageClient) putObjectWithStats(bucket, remotePath, f string, meta map[string]string) error {
+	err := cli.sh.PutObjectFromFile(bucket, remotePath, f, meta)
 	if err != nil {
 		atomic.AddUint64(&cli.fs.fail, 1)
 		return err
@@ -172,7 +168,7 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 			t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 			err = utils.Zip([]string{p}, t)
 			if err != nil {
-				return fmt.Errorf("failed to zip dir %s: %s", t, err.Error())
+				return fmt.Errorf("failed to zip dir: %s", err.Error())
 			}
 		} else {
 			t = p
@@ -182,12 +178,12 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		if e.Zip {
 			err = utils.Zip([]string{p}, t)
 			if err != nil {
-				return fmt.Errorf("failed to zip dir %s: %s", t, err.Error())
+				return fmt.Errorf("failed to zip dir: %s", err.Error())
 			}
 		} else {
-			err = utils.Tar([]string{p}, t)
+			err = utils.TarGz([]string{p}, t)
 			if err != nil {
-				return fmt.Errorf("failed to tar dir %s: %s", t, err.Error())
+				return fmt.Errorf("failed to tgz dir: %s", err.Error())
 			}
 		}
 	} else {
@@ -204,9 +200,24 @@ func (cli *StorageClient) checkFile(remotePath, md5 string) bool {
 	return cli.sh.FileExists(cli.cfg.Bucket, remotePath, md5)
 }
 
+func (cli *StorageClient) fileSizeMd5(f string) (int64, string) {
+	fi, err := os.Stat(f)
+	if err != nil {
+		cli.log.Errorf("failed to get file info: %s", err.Error())
+		return 0, ""
+	}
+	fsize := fi.Size()
+	md5, err := utils.CalculateFileMD5(f)
+	if err != nil {
+		cli.log.Errorf("failed to calculate file (%s) MD5: %s", f, err.Error())
+		return fsize, ""
+	}
+	return fsize, md5
+}
+
 func (cli *StorageClient) checkData(fsize int64, month string) error {
 	if cli.cfg.Limit.Data <= 0 {
-		return nil
+		return fmt.Errorf("limit data should be greater than 0(Byte)")
 	}
 	cli.lock.RLock()
 	defer cli.lock.RUnlock()

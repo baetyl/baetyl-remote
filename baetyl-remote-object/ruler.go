@@ -7,29 +7,26 @@ import (
 	"github.com/256dpi/gomqtt/packet"
 	"github.com/baetyl/baetyl/logger"
 	"github.com/baetyl/baetyl/protocol/mqtt"
-	baetyl "github.com/baetyl/baetyl/sdk/baetyl-go"
 )
 
 // Ruler struct
 type Ruler struct {
-	cfg RuleInfo
-	cli Client
-	hub *mqtt.Dispatcher
-	log logger.Logger
-	tm  sync.Map
+	rule *Rule
+	cli  Client
+	hub  *mqtt.Dispatcher
+	log  logger.Logger
+	tm   sync.Map
 }
 
 // NewRuler can create a ruler
-func NewRuler(ctx baetyl.Context, rule RuleInfo, cli Client) *Ruler {
-	hub := ctx.Config().Hub
-	hub.ClientID = rule.ClientID
-	hub.Subscriptions = []mqtt.TopicInfo{rule.Subscribe}
-	log := logger.WithField("rule", rule.ClientID)
+func NewRuler(rule Rule, hub mqtt.ClientInfo, cli Client) *Ruler {
+	defaults(&rule, &hub)
+	log := logger.WithField("rule", rule.Client.Name)
 	return &Ruler{
-		cfg: rule,
-		hub: mqtt.NewDispatcher(hub, log),
-		cli: cli,
-		log: log,
+		rule: &rule,
+		hub:  mqtt.NewDispatcher(hub, log),
+		cli:  cli,
+		log:  log,
 	}
 }
 
@@ -102,4 +99,13 @@ func (r *Ruler) callback(msg *EventMessage, err error) {
 	if err != nil {
 		r.log.Errorf(err.Error())
 	}
+}
+
+func defaults(rule *Rule, hub *mqtt.ClientInfo) {
+	if rule.Hub.ClientID != "" {
+		hub.ClientID = rule.Hub.ClientID
+	} else {
+		hub.ClientID = rule.Client.Name
+	}
+	hub.Subscriptions = rule.Hub.Subscriptions
 }

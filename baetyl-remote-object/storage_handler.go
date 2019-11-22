@@ -49,13 +49,13 @@ type BosHandler struct {
 // NewBosHandler creates a new newBosClient
 func NewBosHandler(cfg ClientInfo) (*BosHandler, error) {
 	bos, err := bos.NewClient(cfg.Ak, cfg.Sk, cfg.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create bos client (%s): %s", cfg.Name, err.Error())
+	}
 	bos.MultipartSize = cfg.MultiPart.PartSize
 	bos.MaxParallel = (int64)(cfg.MultiPart.Concurrency)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create boe client (%s): %s", cfg.Name, err.Error())
-	}
 	bos.Config.ConnectionTimeoutInMillis = (int)(cfg.Timeout / time.Millisecond)
-	bos.Config.Retry = bce.NewBackOffRetryPolicy(cfg.Retry.Max, (int64)(cfg.Retry.Delay/time.Millisecond), (int64)(cfg.Retry.Base/time.Millisecond))
+	bos.Config.Retry = bce.NewBackOffRetryPolicy(cfg.Backoff.Max, (int64)(cfg.Backoff.Delay/time.Millisecond), (int64)(cfg.Backoff.Base/time.Millisecond))
 	b := &BosHandler{
 		bos: bos,
 		cfg: cfg,

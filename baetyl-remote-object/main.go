@@ -23,26 +23,24 @@ func main() {
 		clients := make(map[string]Client)
 		for _, c := range cfg.Clients {
 			clients[c.Name], err = NewClient(c, ctx.ReportInstance)
+			defer clients[c.Name].Close()
 			if err != nil {
 				return err
 			}
 		}
 		// rulers
 		rulers := make([]*Ruler, 0)
-		for _, r := range cfg.Rules {
-			cli, ok := clients[r.Client.Name]
+		for _, rule := range cfg.Rules {
+			cli, ok := clients[rule.Client.Name]
 			if !ok {
-				return fmt.Errorf("client (%s) not found", r.Client.Name)
+				return fmt.Errorf("client (%s) not found", rule.Client.Name)
 			}
-			ruler := NewRuler(ctx, r, cli)
+			ruler := NewRuler(rule, ctx.Config().Hub, cli)
 			rulers = append(rulers, ruler)
 		}
 		defer func() {
 			for _, ruler := range rulers {
 				ruler.Close()
-			}
-			for _, cli := range clients {
-				cli.Close()
 			}
 		}()
 		for _, cli := range clients {
