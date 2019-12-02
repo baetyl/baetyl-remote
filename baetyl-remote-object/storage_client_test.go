@@ -176,20 +176,20 @@ func TestHandleUploadEvent(t *testing.T) {
 	e.RemotePath = "var/file/test.zip"
 	err = storageClient.handleUploadEvent(e)
 	assert.NotNil(t, err)
-	assert.Equal(t, "failed to zip dir: checking extension: filename must have a .zip extension", err.Error())
+	assert.Equal(t, "failed to zip/tar dir: checking extension: filename must have a .zip extension", err.Error())
 
 	// zip is true, upload directory
 	e.LocalPath = "./example"
 	err = storageClient.handleUploadEvent(e)
 	assert.NotNil(t, err)
-	assert.Equal(t, "failed to zip dir: checking extension: filename must have a .zip extension", err.Error())
+	assert.Equal(t, "failed to zip/tar dir: checking extension: filename must have a .zip extension", err.Error())
 
-	// zip is false, upload directory
+	// zip is false, tar directory and upload
 	e.Zip = false
 	e.RemotePath = "var/file/test.tgz"
 	err = storageClient.handleUploadEvent(e)
 	assert.NotNil(t, err)
-	assert.Equal(t, "failed to tgz dir: output filename must have a .tar.gz or .tgz extension", err.Error())
+	assert.Equal(t, "failed to zip/tar dir: checking extension: filename must have a .tar extension", err.Error())
 }
 
 func TestCheckFile(t *testing.T) {

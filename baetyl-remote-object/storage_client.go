@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/flate"
 	"fmt"
 	"os"
 	"path"
@@ -13,8 +14,22 @@ import (
 	"github.com/baetyl/baetyl/logger"
 	"github.com/baetyl/baetyl/utils"
 	"github.com/docker/distribution/uuid"
+	"github.com/mholt/archiver"
 	"github.com/panjf2000/ants"
 )
+
+type arch interface {
+	// Archive archivies an archive file on disk
+	Archive(source []string, destination string) error
+}
+
+// nonArch origin file
+type nonArch struct{}
+
+// Archive no action
+func (a *nonArch) Archive(source []string, destination string) error {
+	return nil
+}
 
 // Task StorageClient
 type Task struct {
@@ -163,35 +178,45 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return nil
 	}
+	var a arch
 	if ok := utils.FileExists(p); ok {
 		if e.Zip {
 			t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
-			err = utils.Zip([]string{p}, t)
-			if err != nil {
-				return fmt.Errorf("failed to zip dir: %s", err.Error())
+			a = &archiver.Zip{
+				CompressionLevel:     flate.DefaultCompression,
+				MkdirAll:             true,
+				SelectiveCompression: true,
+				OverwriteExisting:    true,
 			}
 		} else {
 			t = p
+			a = &nonArch{}
 		}
 	} else if ok = utils.DirExists(p); ok {
 		t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 		if e.Zip {
-			err = utils.Zip([]string{p}, t)
-			if err != nil {
-				return fmt.Errorf("failed to zip dir: %s", err.Error())
+			a = &archiver.Zip{
+				CompressionLevel:     flate.DefaultCompression,
+				MkdirAll:             true,
+				SelectiveCompression: true,
+				OverwriteExisting:    true,
 			}
 		} else {
-			err = utils.TarGz([]string{p}, t)
-			if err != nil {
-				return fmt.Errorf("failed to tgz dir: %s", err.Error())
+			a = &archiver.Tar{
+				MkdirAll:          true,
+				OverwriteExisting: true,
 			}
 		}
 	} else {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return fmt.Errorf("failed to find path: %s", p)
 	}
+	err = a.Archive([]string{p}, t)
 	if t != p {
 		defer os.RemoveAll(t)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to zip/tar dir: %s", err.Error())
 	}
 	return cli.upload(t, e.RemotePath, e.Meta)
 }

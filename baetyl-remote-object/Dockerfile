@@ -4,6 +4,6 @@
 FROM --platform=$TARGETPLATFORM busybox
 ARG TARGETPLATFORM
 ARG MODULE=baetyl-remote-object
-COPY pem/* /etc/ssl/certs/
+COPY $TARGETPLATFORM/$MODULE/*.pem /etc/ssl/certs/
 COPY $TARGETPLATFORM/$MODULE/bin/$MODULE /bin/
 ENTRYPOINT ["baetyl-remote-object"]

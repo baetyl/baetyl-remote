@@ -27,7 +27,7 @@ type Config struct {
 
 // Backoff policy
 type Backoff struct {
-	Max   int           `yaml:"max" json:"max" default:"0"`       // retry max
+	Max   int           `yaml:"max" json:"max"`                   // retry max
 	Delay time.Duration `yaml:"delay" json:"delay" default:"20s"` // delay time
 	Base  time.Duration `yaml:"base" json:"base" default:"0.3s"`  // base time & *2
 }

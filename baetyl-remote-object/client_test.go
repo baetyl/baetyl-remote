@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const CREATECLIENTERROR = "failed to create storage client (test): kind type unexpected"
+const createClientError = "failed to create storage client (test): kind type unexpected"
 
 func example(map[string]interface{}) error {
 	return nil
@@ -45,5 +45,5 @@ func TestNewClient(t *testing.T) {
 	cfg.Kind = Kind("TEST")
 	_, err = NewClient(*cfg, r)
 	assert.NotNil(t, err)
-	assert.Equal(t, CREATECLIENTERROR, err.Error())
+	assert.Equal(t, createClientError, err.Error())
 }
