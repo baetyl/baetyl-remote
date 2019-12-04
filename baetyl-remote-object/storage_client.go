@@ -31,6 +31,11 @@ func (a *nonArch) Archive(source []string, destination string) error {
 	return nil
 }
 
+func newArch() arch {
+	var a arch
+	return a
+}
+
 // Task StorageClient
 type Task struct {
 	msg *EventMessage
@@ -49,6 +54,7 @@ type FileStats struct {
 type StorageClient struct {
 	cfg    ClientInfo
 	sh     IObjectStorage
+	arch   arch
 	log    logger.Logger
 	tomb   utils.Tomb
 	pool   *ants.PoolWithFunc
@@ -65,6 +71,7 @@ func NewStorageClient(cfg ClientInfo, r report) (*StorageClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	arch := newArch()
 	sh, err := NewObjectStorageHandler(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client (%s): %s", cfg.Name, err.Error())
@@ -73,6 +80,7 @@ func NewStorageClient(cfg ClientInfo, r report) (*StorageClient, error) {
 		cfg:    cfg,
 		report: r,
 		sh:     sh,
+		arch:   arch,
 		log:    logger.WithField("storage client", cfg.Name),
 		pwd:    pwd,
 		fs:     &FileStats{},
@@ -178,11 +186,10 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return nil
 	}
-	var a arch
 	if ok := utils.FileExists(p); ok {
 		if e.Zip {
 			t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
-			a = &archiver.Zip{
+			cli.arch = &archiver.Zip{
 				CompressionLevel:     flate.DefaultCompression,
 				MkdirAll:             true,
 				SelectiveCompression: true,
@@ -190,19 +197,19 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 			}
 		} else {
 			t = p
-			a = &nonArch{}
+			cli.arch = &nonArch{}
 		}
 	} else if ok = utils.DirExists(p); ok {
 		t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 		if e.Zip {
-			a = &archiver.Zip{
+			cli.arch = &archiver.Zip{
 				CompressionLevel:     flate.DefaultCompression,
 				MkdirAll:             true,
 				SelectiveCompression: true,
 				OverwriteExisting:    true,
 			}
 		} else {
-			a = &archiver.Tar{
+			cli.arch = &archiver.Tar{
 				MkdirAll:          true,
 				OverwriteExisting: true,
 			}
@@ -211,7 +218,7 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return fmt.Errorf("failed to find path: %s", p)
 	}
-	err = a.Archive([]string{p}, t)
+	err = cli.arch.Archive([]string{p}, t)
 	if t != p {
 		defer os.RemoveAll(t)
 	}

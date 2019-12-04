@@ -186,7 +186,7 @@ func TestHandleUploadEvent(t *testing.T) {
 
 	// zip is false, tar directory and upload
 	e.Zip = false
-	e.RemotePath = "var/file/test.tgz"
+	e.RemotePath = "var/file/test.tar"
 	err = storageClient.handleUploadEvent(e)
 	assert.NotNil(t, err)
 	assert.Equal(t, "failed to zip/tar dir: checking extension: filename must have a .tar extension", err.Error())
