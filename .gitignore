@@ -4,6 +4,10 @@
 *.dll
 *.so
 *.dylib
+/**/coverage.out
+/**/coverage.html
+/**/.DS_Store
+/output
 
 # Test binary, build with `go test -c`
 *.test
