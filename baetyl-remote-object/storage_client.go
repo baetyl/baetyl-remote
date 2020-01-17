@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	util "github.com/baetyl/baetyl-go/utils"
 	"github.com/baetyl/baetyl/logger"
-	"github.com/baetyl/baetyl/utils"
 	"github.com/docker/distribution/uuid"
 	"github.com/mholt/archiver"
 	"github.com/panjf2000/ants"
@@ -29,11 +29,6 @@ type nonArch struct{}
 // Archive no action
 func (a *nonArch) Archive(source []string, destination string) error {
 	return nil
-}
-
-func newArch() arch {
-	var a arch
-	return a
 }
 
 // Task StorageClient
@@ -54,15 +49,15 @@ type FileStats struct {
 type StorageClient struct {
 	cfg    ClientInfo
 	sh     IObjectStorage
-	arch   arch
-	log    logger.Logger
-	tomb   utils.Tomb
-	pool   *ants.PoolWithFunc
-	lock   sync.RWMutex
 	stats  Stats
 	pwd    string
 	fs     *FileStats
 	report report
+	arch   arch
+	log    logger.Logger
+	tomb   util.Tomb
+	pool   *ants.PoolWithFunc
+	lock   sync.RWMutex
 }
 
 // NewStorageClient creates a new newStorageClient
@@ -71,19 +66,18 @@ func NewStorageClient(cfg ClientInfo, r report) (*StorageClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	arch := newArch()
 	sh, err := NewObjectStorageHandler(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create storage client (%s): %s", cfg.Name, err.Error())
 	}
 	b := &StorageClient{
 		cfg:    cfg,
-		report: r,
 		sh:     sh,
-		arch:   arch,
-		log:    logger.WithField("storage client", cfg.Name),
 		pwd:    pwd,
+		report: r,
+		arch:   &nonArch{},
 		fs:     &FileStats{},
+		log:    logger.WithField("storage client", cfg.Name),
 	}
 	if r != nil {
 		return b, b.tomb.Go(b.reporting)
@@ -186,7 +180,7 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return nil
 	}
-	if ok := utils.FileExists(p); ok {
+	if ok := util.FileExists(p); ok {
 		if e.Zip {
 			t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 			cli.arch = &archiver.Zip{
@@ -197,9 +191,8 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 			}
 		} else {
 			t = p
-			cli.arch = &nonArch{}
 		}
-	} else if ok = utils.DirExists(p); ok {
+	} else if ok = util.DirExists(p); ok {
 		t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 		if e.Zip {
 			cli.arch = &archiver.Zip{
@@ -239,7 +232,7 @@ func (cli *StorageClient) fileSizeMd5(f string) (int64, string) {
 		return 0, ""
 	}
 	fsize := fi.Size()
-	md5, err := utils.CalculateFileMD5(f)
+	md5, err := util.CalculateFileMD5(f)
 	if err != nil {
 		cli.log.Errorf("failed to calculate file (%s) MD5: %s", f, err.Error())
 		return fsize, ""
@@ -309,7 +302,7 @@ func (cli *StorageClient) Start() error {
 		cli.log.Errorf("failed to make dir (%s): %s", cli.cfg.TempPath, err.Error())
 		return err
 	}
-	if ok := utils.FileExists(cli.cfg.Limit.Path); !ok {
+	if ok := util.FileExists(cli.cfg.Limit.Path); !ok {
 		basepath := path.Dir(cli.cfg.Limit.Path)
 		err = os.MkdirAll(basepath, 0755)
 		if err != nil {
@@ -323,7 +316,7 @@ func (cli *StorageClient) Start() error {
 			return err
 		}
 	}
-	utils.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
+	util.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
 	p, err := ants.NewPoolWithFunc(cli.cfg.Pool.Worker, cli.call, ants.WithExpiryDuration(cli.cfg.Pool.Idletime))
 	if err != nil {
 		cli.log.Errorf("failed to create a pool: %s", err.Error())

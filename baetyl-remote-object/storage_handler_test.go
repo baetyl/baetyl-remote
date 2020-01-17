@@ -12,9 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const EMPTYACCESSKEYERROR = "failed to create bos client (test): accessKeyId should not be empty"
-const EMPTYSECRETKEYERROR = "failed to create bos client (test): secretKey should not be empty"
-
 func TestNewBosHandler(t *testing.T) {
 	// var bosHandler *BosHandler
 	// round 1: create bos handler normally with none empty AccessKey and SecretKey
@@ -34,14 +31,14 @@ func TestNewBosHandler(t *testing.T) {
 	cfg.Sk = uuid.Generate().String()
 	_, err = NewBosHandler(*cfg)
 	assert.NotNil(t, err)
-	assert.Equal(t, EMPTYACCESSKEYERROR, err.Error())
+	assert.Equal(t, "failed to create bos client (test): accessKeyId should not be empty", err.Error())
 
 	// round 4: create bos handler failed with empty SecretKey and none empty AccessKey
 	cfg.Ak = uuid.Generate().String()
 	cfg.Sk = ""
 	_, err = NewBosHandler(*cfg)
 	assert.NotNil(t, err)
-	assert.Equal(t, EMPTYSECRETKEYERROR, err.Error())
+	assert.Equal(t, "failed to create bos client (test): secretKey should not be empty", err.Error())
 }
 
 func TestPutObjectFromFile(t *testing.T) {
