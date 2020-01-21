@@ -236,7 +236,7 @@ func TestStartAndClose(t *testing.T) {
 	storageClient.cfg.TempPath = "/usr/data.yml"
 	err = storageClient.Start()
 	assert.NotNil(t, err)
-	assert.Equal(t, "mkdir /usr/data.yml: operation not permitted", err.Error())
+	assert.Equal(t, "mkdir /usr/data.yml: permission denied", err.Error())
 
 	// cannot make directory of limit path
 	dir, err := ioutil.TempDir("", "example")
