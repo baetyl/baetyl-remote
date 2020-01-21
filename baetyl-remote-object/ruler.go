@@ -114,19 +114,11 @@ func (r *Ruler) RuleHandler(msg *EventMessage) error {
 }
 
 func (r *Ruler) callback(msg *EventMessage, err error) {
-	if msg.QOS == 1 {
-		if err == nil {
-			puback := mqtt.NewPuback()
-			puback.ID = mqtt.ID(msg.ID)
-			err = r.hub.Send(puback)
-			if err != nil {
-				r.log.Error(err.Error())
-			}
-		}
-		r.tm.Delete(msg.ID)
-	}
 	if err != nil {
 		r.log.Error(err.Error())
+	}
+	if msg.QOS == 1 && err == nil {
+		r.tm.Delete(msg.ID)
 	}
 }
 

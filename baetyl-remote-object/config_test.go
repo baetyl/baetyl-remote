@@ -30,8 +30,6 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, true, c.Clients[0].Limit.Enable)
 	assert.Equal(t, utils.Size(9663676416), c.Clients[0].Limit.Data)
 	assert.Equal(t, "var/lib/baetyl/data/stats.yml", c.Clients[0].Limit.Path)
-	assert.Equal(t, "debug", c.Logger.Level)
-	assert.Equal(t, "var/log/baetyl/service.log", c.Logger.Path)
 
 	assert.Len(t, c.Rules, 1)
 	assert.Equal(t, "remote-bos", c.Rules[0].Hub.ClientID)

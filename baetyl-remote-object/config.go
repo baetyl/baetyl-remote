@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/baetyl/baetyl-go/log"
 	"github.com/baetyl/baetyl-go/mqtt"
 	"github.com/baetyl/baetyl-go/utils"
 	yaml "gopkg.in/yaml.v2"
@@ -24,7 +23,6 @@ const (
 type Config struct {
 	Clients []ClientInfo `yaml:"clients" json:"clients" default:"[]"`
 	Rules   []Rule       `yaml:"rules" json:"rules" default:"[]"`
-	Logger  log.Config   `yaml:"logger" json:"logger"`
 }
 
 // Backoff policy

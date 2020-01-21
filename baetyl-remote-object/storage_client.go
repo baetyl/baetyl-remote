@@ -136,7 +136,7 @@ func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) e
 		month := time.Unix(0, time.Now().UnixNano()).Format("2006-01")
 		err := cli.checkData(fsize, month)
 		if err != nil {
-			cli.log.Error("failed to pass data check")
+			cli.log.Error("failed to pass data check", log.Any("error message", err.Error()))
 			atomic.AddUint64(&cli.fs.limit, 1)
 			return nil
 		}
@@ -156,6 +156,7 @@ func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) e
 func (cli *StorageClient) putObjectWithStats(bucket, remotePath, f string, meta map[string]string) error {
 	err := cli.sh.PutObjectFromFile(bucket, remotePath, f, meta)
 	if err != nil {
+		cli.log.Error("failed to upload file", log.Any("localPath", f), log.Any("remotePath", remotePath))
 		atomic.AddUint64(&cli.fs.fail, 1)
 		return err
 	}
@@ -224,7 +225,7 @@ func (cli *StorageClient) checkFile(remotePath, md5 string) bool {
 func (cli *StorageClient) fileSizeMd5(f string) (int64, string) {
 	fi, err := os.Stat(f)
 	if err != nil {
-		cli.log.Error("failed to get file info", log.Any("fileinfo", err.Error()))
+		cli.log.Error("failed to get file info", log.Any("fileInfo", err.Error()))
 		return 0, ""
 	}
 	fsize := fi.Size()
@@ -288,7 +289,7 @@ func (cli *StorageClient) Start() error {
 	utils.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
 	p, err := ants.NewPoolWithFunc(cli.cfg.Pool.Worker, cli.call, ants.WithExpiryDuration(cli.cfg.Pool.Idletime))
 	if err != nil {
-		cli.log.Error("failed to create a pool")
+		cli.log.Error("failed to create a pool", log.Any("error message", err.Error()))
 		return err
 	}
 	cli.pool = p
