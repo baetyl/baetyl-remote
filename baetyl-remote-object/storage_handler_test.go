@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go/awstesting/unit"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/baetyl/baetyl/utils"
+	"github.com/baetyl/baetyl-go/utils"
 	"github.com/docker/distribution/uuid"
 	"github.com/stretchr/testify/assert"
 )

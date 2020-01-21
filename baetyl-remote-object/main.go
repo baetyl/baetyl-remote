@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	baetyl "github.com/baetyl/baetyl/sdk/baetyl-go"
+	"github.com/baetyl/baetyl-go/context"
 )
 
 // mo bridge module of mqtt servers
@@ -13,16 +13,16 @@ type mo struct {
 }
 
 func main() {
-	baetyl.Run(func(ctx baetyl.Context) error {
+	context.Run(func(ctx context.Context) error {
 		var cfg Config
 		err := ctx.LoadConfig(&cfg)
 		if err != nil {
 			return err
 		}
-		// clients
+		// http clients
 		clients := make(map[string]Client)
 		for _, c := range cfg.Clients {
-			clients[c.Name], err = NewClient(c, ctx.ReportInstance)
+			clients[c.Name], err = NewClient(c)
 			defer clients[c.Name].Close()
 			if err != nil {
 				return err
@@ -35,7 +35,10 @@ func main() {
 			if !ok {
 				return fmt.Errorf("client (%s) not found", rule.Client.Name)
 			}
-			ruler := NewRuler(rule, ctx.Config().Hub, cli)
+			ruler, err := NewRuler(rule, cli)
+			if err != nil {
+				return fmt.Errorf("failed to create ruler")
+			}
 			rulers = append(rulers, ruler)
 		}
 		defer func() {
@@ -50,7 +53,7 @@ func main() {
 			}
 		}
 		for _, ruler := range rulers {
-			err := ruler.Start()
+			err := ruler.Start(ctx.Config().Mqtt)
 			if err != nil {
 				return err
 			}

@@ -4,8 +4,9 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/baetyl/baetyl/protocol/mqtt"
-	"github.com/docker/go-units"
+	"github.com/baetyl/baetyl-go/log"
+	"github.com/baetyl/baetyl-go/mqtt"
+	"github.com/baetyl/baetyl-go/utils"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -23,6 +24,7 @@ const (
 type Config struct {
 	Clients []ClientInfo `yaml:"clients" json:"clients" default:"[]"`
 	Rules   []Rule       `yaml:"rules" json:"rules" default:"[]"`
+	Logger  log.Config   `yaml:"logger" json:"logger"`
 }
 
 // Backoff policy
@@ -40,29 +42,31 @@ type Pool struct {
 
 // ClientInfo client config
 type ClientInfo struct {
-	Name      string        `yaml:"name" json:"name" validate:"nonzero"`
-	Address   string        `yaml:"address" json:"address"`
-	Region    string        `yaml:"region" json:"region" default:"us-east-1"`
-	Ak        string        `yaml:"ak" json:"ak" validate:"nonzero"`
-	Sk        string        `yaml:"sk" json:"sk" validate:"nonzero"`
+	AwsS3     `yaml:",inline" json:",inline"`
 	Kind      Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
 	Timeout   time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
 	Backoff   Backoff       `yaml:"backoff" json:"backoff"`
 	Pool      Pool          `yaml:"pool" json:"pool"`
-	Bucket    string        `yaml:"bucket" json:"bucket" validate:"nonzero"`
 	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
 	MultiPart MultiPart     `yaml:"multipart" json:"multipart"`
 	Limit     Limit         `yaml:"limit" json:"limit"`
-	Report    struct {
-		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
-	} `yaml:"report" json:"report"`
+}
+
+// AwsS3 (BOS、CEPH) client config
+type AwsS3 struct {
+	Name     string `yaml:"name" json:"name" validate:"nonzero"`
+	Endpoint string `yaml:"endpoint" json:"endpoint"`
+	Region   string `yaml:"region" json:"region" default:"us-east-1"`
+	Ak       string `yaml:"ak" json:"ak" validate:"nonzero"`
+	Sk       string `yaml:"sk" json:"sk" validate:"nonzero"`
+	Bucket   string `yaml:"bucket" json:"bucket" validate:"nonzero"`
 }
 
 // Rule function rule config
 type Rule struct {
 	Hub struct {
-		ClientID      string           `yaml:"clientid" json:"clientid"`
-		Subscriptions []mqtt.TopicInfo `yaml:"subscriptions" json:"subscriptions" default:"[]"`
+		ClientID      string          `yaml:"clientid" json:"clientid"`
+		Subscriptions []mqtt.QOSTopic `yaml:"subscriptions" json:"subscriptions" default:"[]"`
 	} `yaml:"hub" json:"hub"`
 	Client struct {
 		Name string `yaml:"name" json:"name" validate:"nonzero"`
@@ -71,67 +75,15 @@ type Rule struct {
 
 // MultiPart config
 type MultiPart struct {
-	PartSize    int64 `yaml:"partsize" json:"partsize" default:"1048576000"`
-	Concurrency int   `yaml:"concurrency" json:"concurrency" default:"10"`
-}
-
-type multipart struct {
-	PartSize    string `yaml:"partsize" json:"partsize"`
-	Concurrency int    `yaml:"concurrency" json:"concurrency"`
+	PartSize    utils.Size `yaml:"partsize" json:"partsize" default:"100m"`
+	Concurrency int        `yaml:"concurrency" json:"concurrency" default:"10"`
 }
 
 // Limit limit config
 type Limit struct {
-	Enable bool   `yaml:"enable" json:"enable" default:"false"`
-	Data   int64  `yaml:"data" json:"data" default:"1073741824"`
-	Path   string `yaml:"path" json:"path" default:"var/lib/baetyl/data/stats.yml"`
-}
-
-type limit struct {
-	Enable bool   `yaml:"enable" json:"enable"`
-	Data   string `yaml:"data" json:"data"`
-	Path   string `yaml:"path" json:"path"`
-}
-
-// UnmarshalYAML customizes unmarshal
-func (l *Limit) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var ls limit
-	err := unmarshal(&ls)
-	if err != nil {
-		return err
-	}
-	if ls.Enable {
-		l.Enable = ls.Enable
-	}
-	if ls.Data != "" {
-		l.Data, err = units.RAMInBytes(ls.Data)
-		if err != nil {
-			return err
-		}
-	}
-	if ls.Path != "" {
-		l.Path = ls.Path
-	}
-	return nil
-}
-
-// UnmarshalYAML customizes unmarshal
-func (m *MultiPart) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var ms multipart
-	err := unmarshal(&ms)
-	if err != nil {
-		return err
-	}
-	if ms.PartSize != "" {
-		m.PartSize, err = units.RAMInBytes(ms.PartSize)
-		if err != nil {
-			return err
-		}
-	}
-	if ms.Concurrency != 0 {
-		m.Concurrency = ms.Concurrency
-	}
-	return nil
+	Enable bool       `yaml:"enable" json:"enable" default:"false"`
+	Data   utils.Size `yaml:"data" json:"data" default:"1g"`
+	Path   string     `yaml:"path" json:"path" default:"var/lib/baetyl/data/stats.yml"`
 }
 
 // Item data count

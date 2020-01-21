@@ -48,12 +48,12 @@ type BosHandler struct {
 
 // NewBosHandler creates a new newBosClient
 func NewBosHandler(cfg ClientInfo) (*BosHandler, error) {
-	bos, err := bos.NewClient(cfg.Ak, cfg.Sk, cfg.Address)
+	bos, err := bos.NewClient(cfg.Ak, cfg.Sk, cfg.Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bos client (%s): %s", cfg.Name, err.Error())
 	}
-	bos.MultipartSize = cfg.MultiPart.PartSize
-	bos.MaxParallel = (int64)(cfg.MultiPart.Concurrency)
+	bos.MultipartSize = int64(cfg.MultiPart.PartSize)
+	bos.MaxParallel = int64(cfg.MultiPart.Concurrency)
 	bos.Config.ConnectionTimeoutInMillis = (int)(cfg.Timeout / time.Millisecond)
 	bos.Config.Retry = bce.NewBackOffRetryPolicy(cfg.Backoff.Max, (int64)(cfg.Backoff.Delay/time.Millisecond), (int64)(cfg.Backoff.Base/time.Millisecond))
 	b := &BosHandler{
@@ -94,9 +94,9 @@ func NewCephClient(cfg ClientInfo) (*S3Handler, error) {
 	// Configure to use S3 Server
 	s3Config := &aws.Config{
 		Credentials:      credentials.NewStaticCredentials(cfg.Ak, cfg.Sk, ""),
-		Endpoint:         aws.String(cfg.Address),
+		Endpoint:         aws.String(cfg.Endpoint),
 		Region:           aws.String("us-east-1"),
-		DisableSSL:       aws.Bool(!strings.HasPrefix(cfg.Address, "https")),
+		DisableSSL:       aws.Bool(!strings.HasPrefix(cfg.Endpoint, "https")),
 		S3ForcePathStyle: aws.Bool(true),
 	}
 	newSession := session.New(s3Config)
@@ -147,12 +147,12 @@ func (cli *S3Handler) PutObjectFromFile(Bucket, remotePath, filename string, met
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cli.cfg.Timeout)
 	defer cancel()
-	// _, err = cli.ceph.PutObjectWithContext(ctx, params)
+
 	_, err = cli.uploader.UploadWithContext(ctx, params, func(u *s3manager.Uploader) {
-		u.PartSize = cli.cfg.MultiPart.PartSize
+		u.PartSize = int64(cli.cfg.MultiPart.PartSize)
 		u.LeavePartsOnError = true
 		u.Concurrency = cli.cfg.MultiPart.Concurrency
-	}) //并发数
+	})
 
 	return err
 }

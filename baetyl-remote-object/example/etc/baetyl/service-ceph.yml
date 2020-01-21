@@ -1,10 +1,10 @@
-hub:
+mqtt:
   address: tcp://127.0.0.1:1883
   username: test
   password: hahaha
 clients:
-  - name: baidu-bos
-    address: http://127.0.0.1:8080
+  - name: ceph-test
+    endpoint: http://127.0.0.1:8080
     ak: XXXXXXXXXXXXXXXXXXXXXXXXXX
     sk: XXXXXXXXXXXXXXXXXXXXXXXXXX
     kind: CEPH
@@ -14,21 +14,19 @@ clients:
     pool:
       worker: 1000
       idletime: 30s
-    bucket: bos-remote-demo
+    bucket: ceph-demo
     temppath: var/lib/baetyl/tmp
-    # max 1000g
     limit:
       enable: true
       data: 9g
       path: var/lib/baetyl/data/stats.yml
 rules:
   - hub:
-      clientid: remote-write-bos
+      clientid: remote-ceph
       subscriptions:
-        # hub topic
         - topic: t
     client:
-      name: baidu-bos
+      name: ceph-test
 logger:
   path: var/log/baetyl/service.log
   level: "debug"

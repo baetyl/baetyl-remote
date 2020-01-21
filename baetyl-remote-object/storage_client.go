@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	util "github.com/baetyl/baetyl-go/utils"
-	"github.com/baetyl/baetyl/logger"
+	"github.com/baetyl/baetyl-go/log"
+	"github.com/baetyl/baetyl-go/utils"
 	"github.com/docker/distribution/uuid"
 	"github.com/mholt/archiver"
 	"github.com/panjf2000/ants"
@@ -47,21 +47,20 @@ type FileStats struct {
 
 // StorageClient StorageClient
 type StorageClient struct {
-	cfg    ClientInfo
-	sh     IObjectStorage
-	stats  Stats
-	pwd    string
-	fs     *FileStats
-	report report
-	arch   arch
-	log    logger.Logger
-	tomb   util.Tomb
-	pool   *ants.PoolWithFunc
-	lock   sync.RWMutex
+	cfg   ClientInfo
+	sh    IObjectStorage
+	stats Stats
+	pwd   string
+	fs    *FileStats
+	arch  arch
+	log   *log.Logger
+	tomb  utils.Tomb
+	pool  *ants.PoolWithFunc
+	lock  sync.RWMutex
 }
 
 // NewStorageClient creates a new newStorageClient
-func NewStorageClient(cfg ClientInfo, r report) (*StorageClient, error) {
+func NewStorageClient(cfg ClientInfo) (*StorageClient, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
@@ -71,16 +70,12 @@ func NewStorageClient(cfg ClientInfo, r report) (*StorageClient, error) {
 		return nil, fmt.Errorf("failed to create storage client (%s): %s", cfg.Name, err.Error())
 	}
 	b := &StorageClient{
-		cfg:    cfg,
-		sh:     sh,
-		pwd:    pwd,
-		report: r,
-		arch:   &nonArch{},
-		fs:     &FileStats{},
-		log:    logger.WithField("storage client", cfg.Name),
-	}
-	if r != nil {
-		return b, b.tomb.Go(b.reporting)
+		cfg:  cfg,
+		sh:   sh,
+		pwd:  pwd,
+		arch: &nonArch{},
+		fs:   &FileStats{},
+		log:  log.With(log.Any("remote-object", "storage")),
 	}
 	return b, nil
 }
@@ -123,7 +118,7 @@ func (cli *StorageClient) call(task interface{}) {
 		err = fmt.Errorf("EventMessage type unexpected")
 	}
 	if err != nil {
-		cli.log.Errorf("failed to fetch: %s", err.Error())
+		cli.log.Error("failed to fetch message")
 	}
 	if t.cb != nil {
 		t.cb(t.msg, err)
@@ -141,7 +136,7 @@ func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) e
 		month := time.Unix(0, time.Now().UnixNano()).Format("2006-01")
 		err := cli.checkData(fsize, month)
 		if err != nil {
-			cli.log.Errorf("failed to pass data check: %s", err.Error())
+			cli.log.Error("failed to pass data check")
 			atomic.AddUint64(&cli.fs.limit, 1)
 			return nil
 		}
@@ -165,22 +160,23 @@ func (cli *StorageClient) putObjectWithStats(bucket, remotePath, f string, meta 
 		return err
 	}
 	atomic.AddUint64(&cli.fs.success, 1)
+	cli.log.Info("upload file success", log.Any("localPath", f), log.Any("remotePath", remotePath))
 	return nil
 }
 
 func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 	if strings.Contains(e.LocalPath, "..") {
-		cli.log.Errorf("failed to pass LocalPath (%s) check: the local path can't contains ..", e.LocalPath)
+		cli.log.Error("failed to pass LocalPath check: the local path can't contains ..", log.Any("localPath", e.LocalPath))
 		return nil
 	}
 	var t string
 	p, err := filepath.EvalSymlinks(path.Join(cli.pwd, e.LocalPath))
 	if err != nil {
-		cli.log.Errorf("failed get real dir path: %s", err.Error())
+		cli.log.Error("failed get real path", log.Any("path", p))
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return nil
 	}
-	if ok := util.FileExists(p); ok {
+	if ok := utils.FileExists(p); ok {
 		if e.Zip {
 			t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 			cli.arch = &archiver.Zip{
@@ -192,7 +188,7 @@ func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 		} else {
 			t = p
 		}
-	} else if ok = util.DirExists(p); ok {
+	} else if ok = utils.DirExists(p); ok {
 		t = path.Join(cli.cfg.TempPath, uuid.Generate().String())
 		if e.Zip {
 			cli.arch = &archiver.Zip{
@@ -228,13 +224,13 @@ func (cli *StorageClient) checkFile(remotePath, md5 string) bool {
 func (cli *StorageClient) fileSizeMd5(f string) (int64, string) {
 	fi, err := os.Stat(f)
 	if err != nil {
-		cli.log.Errorf("failed to get file info: %s", err.Error())
+		cli.log.Error("failed to get file info", log.Any("fileinfo", err.Error()))
 		return 0, ""
 	}
 	fsize := fi.Size()
-	md5, err := util.CalculateFileMD5(f)
+	md5, err := utils.CalculateFileMD5(f)
 	if err != nil {
-		cli.log.Errorf("failed to calculate file (%s) MD5: %s", f, err.Error())
+		cli.log.Error("failed to calculate file MD5", log.Any("file", f), log.Any("MD5", md5))
 		return fsize, ""
 	}
 	return fsize, md5
@@ -248,7 +244,7 @@ func (cli *StorageClient) checkData(fsize int64, month string) error {
 	defer cli.lock.RUnlock()
 	if _, ok := cli.stats.Months[month]; ok {
 		new := cli.stats.Months[month].Bytes + fsize
-		if new > cli.cfg.Limit.Data {
+		if new > int64(cli.cfg.Limit.Data) {
 			return fmt.Errorf("exceeds max upload data size of this month，stop to upload and will reset next month")
 		}
 	}
@@ -268,62 +264,35 @@ func (cli *StorageClient) increaseData(fsize int64, month string) error {
 	return DumpYAML(cli.cfg.Limit.Path, &cli.stats)
 }
 
-func (cli *StorageClient) reporting() error {
-	defer cli.log.Debugf("storage client reporting task stopped")
-	var err error
-	t := time.NewTicker(cli.cfg.Report.Interval)
-	defer t.Stop()
-	for {
-		select {
-		case <-cli.tomb.Dying():
-			return nil
-		case <-t.C:
-			stats := map[string]interface{}{
-				cli.cfg.Name: map[string]interface{}{
-					"success": cli.fs.success,
-					"fail":    cli.fs.fail,
-					"limit":   cli.fs.limit,
-					"deleted": cli.fs.deleted,
-				},
-			}
-			err = cli.report(stats)
-			if err != nil {
-				cli.log.Warnf("failed to report storage client file stats")
-			}
-			cli.log.Debugln(stats)
-		}
-	}
-}
-
 // Start start all worker
 func (cli *StorageClient) Start() error {
 	err := os.MkdirAll(cli.cfg.TempPath, 0755)
 	if err != nil {
-		cli.log.Errorf("failed to make dir (%s): %s", cli.cfg.TempPath, err.Error())
+		cli.log.Error("failed to make directory", log.Any("tempPath", cli.cfg.TempPath))
 		return err
 	}
-	if ok := util.FileExists(cli.cfg.Limit.Path); !ok {
+	if ok := utils.FileExists(cli.cfg.Limit.Path); !ok {
 		basepath := path.Dir(cli.cfg.Limit.Path)
 		err = os.MkdirAll(basepath, 0755)
 		if err != nil {
-			cli.log.Errorf("failed to make dir (%s): %s", basepath, err.Error())
+			cli.log.Error("failed to make directory", log.Any("basePath", basepath))
 			return err
 		}
 		f, err := os.Create(cli.cfg.Limit.Path)
 		defer f.Close()
 		if err != nil {
-			cli.log.Errorf("failed to make file (%s): %s", cli.cfg.Limit.Path, err.Error())
+			cli.log.Error("failed to make file", log.Any("limitPath", cli.cfg.Limit.Path))
 			return err
 		}
 	}
-	util.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
+	utils.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
 	p, err := ants.NewPoolWithFunc(cli.cfg.Pool.Worker, cli.call, ants.WithExpiryDuration(cli.cfg.Pool.Idletime))
 	if err != nil {
-		cli.log.Errorf("failed to create a pool: %s", err.Error())
+		cli.log.Error("failed to create a pool")
 		return err
 	}
 	cli.pool = p
-	cli.log.Debugf("storage client start")
+	cli.log.Debug("storage client start")
 	return nil
 }
 
@@ -331,6 +300,6 @@ func (cli *StorageClient) Start() error {
 func (cli *StorageClient) Close() error {
 	cli.pool.Release()
 	cli.tomb.Kill(nil)
-	cli.log.Debugf("storage client closed")
+	cli.log.Debug("storage client closed")
 	return cli.tomb.Wait()
 }

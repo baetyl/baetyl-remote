@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baetyl/baetyl/protocol/mqtt"
+	"github.com/baetyl/baetyl-go/mqtt"
 	"github.com/stretchr/testify/assert"
 )
 
-func newStorageClient(r report) (*StorageClient, error) {
+func newStorageClient() (*StorageClient, error) {
+	cfg.Name = "test"
 	cfg.Kind = Kind("S3")
 	cfg.Region = "us-east-1"
-	storageClient, err := NewStorageClient(*cfg, r)
+	storageClient, err := NewStorageClient(*cfg)
 	return storageClient, err
 }
 
@@ -31,39 +32,25 @@ func generateTempPath(prefix string) (string, error) {
 	return fpath, nil
 }
 
-func TestNewStorageClient(t *testing.T) {
-	// round 1: report is not nil
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
-	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
-	assert.Equal(t, "test", storageClient.cfg.Name)
-
-	// round 2: report is nil
-	storageClient, err = newStorageClient(nil)
-	assert.Nil(t, err)
-	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
-	assert.Equal(t, "test", storageClient.cfg.Name)
-}
-
 // CallAsync and invoke
 func TestCallAsync(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 
 	// start storage client
 	tempPath, err := generateTempPath("example")
 	defer os.RemoveAll(path.Dir(tempPath))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	storageClient.cfg.TempPath = tempPath
 	statsPath, err := generateTempPath("test")
 	defer os.RemoveAll(path.Dir(statsPath))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	storageClient.cfg.Limit.Path = statsPath
 	storageClient.cfg.Pool.Worker = 10
 	storageClient.cfg.Pool.Idletime = time.Duration(30000000000)
 	err = storageClient.Start()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	defer storageClient.Close()
 
 	msg := &EventMessage{
@@ -76,19 +63,21 @@ func TestCallAsync(t *testing.T) {
 			Content: nil,
 		},
 	}
-	hub := new(mqtt.ClientInfo)
-	ruler := NewRuler(*ru, *hub, Client(storageClient))
+	hub := new(mqtt.ClientConfig)
+	ruler, err := NewRuler(*ru, Client(storageClient))
+	ruler.Start(*hub)
 	err = storageClient.CallAsync(msg, ruler.callback)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCall(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 	// create ruler
-	hub := new(mqtt.ClientInfo)
-	ruler := NewRuler(*ru, *hub, Client(storageClient))
+	hub := new(mqtt.ClientConfig)
+	ruler, err := NewRuler(*ru, Client(storageClient))
+	ruler.Start(*hub)
 	task1 := &Task{
 		msg: &EventMessage{
 			ID:    1,
@@ -112,8 +101,8 @@ func TestCall(t *testing.T) {
 
 func TestUpload(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 
 	// round 1: local file is not exist
 	err = storageClient.upload("var/test/file", "", map[string]string{})
@@ -144,8 +133,8 @@ func TestUpload(t *testing.T) {
 
 func TestHandleUploadEvent(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 
 	// contains '..' of local path
 	e := &UploadEvent{
@@ -155,12 +144,12 @@ func TestHandleUploadEvent(t *testing.T) {
 		Meta:       make(map[string]string),
 	}
 	err = storageClient.handleUploadEvent(e)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// wrong path
 	e.LocalPath = "./test/baetyl/service.yml"
 	err = storageClient.handleUploadEvent(e)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// real path
 	e.LocalPath = "./example/test/baetyl/service.yml"
@@ -195,16 +184,16 @@ func TestHandleUploadEvent(t *testing.T) {
 func TestCheckFile(t *testing.T) {
 	remotePath := "var/file/service.yml"
 	md5 := "4a0fb0ea68b05a84234e420d1f8cb32b"
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 	rlt := storageClient.checkFile(remotePath, md5)
 	assert.Equal(t, false, rlt)
 }
 
 func TestCheckData(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 
 	// round 1: limit data less than 0(Byte)
 	storageClient.cfg.Limit.Enable = true
@@ -228,13 +217,13 @@ func TestCheckData(t *testing.T) {
 	// round 3: limit data greater than 0(Byte), will not exceed
 	storageClient.cfg.Limit.Data = 107374182400
 	err = storageClient.checkData(2000000000, "2019-09")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestStartAndClose(t *testing.T) {
 	// create storage client
-	storageClient, err := newStorageClient(r)
-	assert.Nil(t, err)
+	storageClient, err := newStorageClient()
+	assert.NoError(t, err)
 
 	// file is not exist
 	storageClient.cfg.TempPath = "var/file/test"
@@ -251,7 +240,7 @@ func TestStartAndClose(t *testing.T) {
 
 	// cannot make directory of limit path
 	dir, err := ioutil.TempDir("", "example")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	defer os.RemoveAll(dir)
 	storageClient.cfg.TempPath = dir
 	storageClient.cfg.Limit.Path = "/var/file/service.yml"
@@ -270,9 +259,9 @@ func TestStartAndClose(t *testing.T) {
 	storageClient.cfg.Pool.Worker = 10
 	storageClient.cfg.Pool.Idletime = time.Duration(30000000000)
 	err = storageClient.Start()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// storage client close
 	err = storageClient.Close()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

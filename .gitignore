@@ -8,6 +8,9 @@
 /**/coverage.html
 /**/.DS_Store
 /output
+/.vscode
+/**/var
+/**/etc
 
 # Test binary, build with `go test -c`
 *.test
