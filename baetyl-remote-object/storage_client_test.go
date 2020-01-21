@@ -232,12 +232,6 @@ func TestStartAndClose(t *testing.T) {
 	assert.NotNil(t, err)
 	assert.Equal(t, "open : no such file or directory", err.Error())
 
-	// cannot make directory of temppath
-	storageClient.cfg.TempPath = "/usr/data.yml"
-	err = storageClient.Start()
-	assert.NotNil(t, err)
-	assert.Equal(t, "mkdir /usr/data.yml: permission denied", err.Error())
-
 	// cannot make directory of limit path
 	dir, err := ioutil.TempDir("", "example")
 	assert.NoError(t, err)
