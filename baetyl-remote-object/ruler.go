@@ -93,7 +93,7 @@ func (r *Ruler) OnError(err error) {
 
 // processEvent processes event
 func (r *Ruler) processEvent(pkt *mqtt.Publish) (*Event, error) {
-	r.log.Debug("start to process event", log.Any("payload", string(pkt.Message.Payload)))
+	r.log.Debug("start to process event")
 	e, err := NewEvent(pkt.Message.Payload)
 	if err != nil {
 		return nil, fmt.Errorf("event invalid: %s", err.Error())

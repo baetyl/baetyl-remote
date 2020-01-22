@@ -136,7 +136,7 @@ func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) e
 		month := time.Unix(0, time.Now().UnixNano()).Format("2006-01")
 		err := cli.checkData(fsize, month)
 		if err != nil {
-			cli.log.Error("failed to pass data check", log.Any("error message", err.Error()))
+			cli.log.Error("failed to pass data check", log.Error(err))
 			atomic.AddUint64(&cli.fs.limit, 1)
 			return nil
 		}
@@ -156,24 +156,24 @@ func (cli *StorageClient) upload(f, remotePath string, meta map[string]string) e
 func (cli *StorageClient) putObjectWithStats(bucket, remotePath, f string, meta map[string]string) error {
 	err := cli.sh.PutObjectFromFile(bucket, remotePath, f, meta)
 	if err != nil {
-		cli.log.Error("failed to upload file", log.Any("localPath", f), log.Any("remotePath", remotePath))
+		cli.log.Error("failed to upload file", log.Error(err))
 		atomic.AddUint64(&cli.fs.fail, 1)
 		return err
 	}
 	atomic.AddUint64(&cli.fs.success, 1)
-	cli.log.Info("upload file success", log.Any("localPath", f), log.Any("remotePath", remotePath))
+	cli.log.Info("upload file success")
 	return nil
 }
 
 func (cli *StorageClient) handleUploadEvent(e *UploadEvent) error {
 	if strings.Contains(e.LocalPath, "..") {
-		cli.log.Error("failed to pass LocalPath check: the local path can't contains ..", log.Any("localPath", e.LocalPath))
+		cli.log.Error("failed to pass LocalPath check: the local path can't contains ..")
 		return nil
 	}
 	var t string
 	p, err := filepath.EvalSymlinks(path.Join(cli.pwd, e.LocalPath))
 	if err != nil {
-		cli.log.Error("failed get real path", log.Any("path", p))
+		cli.log.Error("failed get real path", log.Error(err))
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return nil
 	}
@@ -225,13 +225,13 @@ func (cli *StorageClient) checkFile(remotePath, md5 string) bool {
 func (cli *StorageClient) fileSizeMd5(f string) (int64, string) {
 	fi, err := os.Stat(f)
 	if err != nil {
-		cli.log.Error("failed to get file info", log.Any("fileInfo", err.Error()))
+		cli.log.Error("failed to get file info", log.Error(err))
 		return 0, ""
 	}
 	fsize := fi.Size()
 	md5, err := utils.CalculateFileMD5(f)
 	if err != nil {
-		cli.log.Error("failed to calculate file MD5", log.Any("file", f), log.Any("MD5", md5))
+		cli.log.Error("failed to calculate file MD5", log.Error(err))
 		return fsize, ""
 	}
 	return fsize, md5
@@ -269,27 +269,27 @@ func (cli *StorageClient) increaseData(fsize int64, month string) error {
 func (cli *StorageClient) Start() error {
 	err := os.MkdirAll(cli.cfg.TempPath, 0755)
 	if err != nil {
-		cli.log.Error("failed to make directory", log.Any("tempPath", cli.cfg.TempPath))
+		cli.log.Error("failed to make directory", log.Error(err))
 		return err
 	}
 	if ok := utils.FileExists(cli.cfg.Limit.Path); !ok {
 		basepath := path.Dir(cli.cfg.Limit.Path)
 		err = os.MkdirAll(basepath, 0755)
 		if err != nil {
-			cli.log.Error("failed to make directory", log.Any("basePath", basepath))
+			cli.log.Error("failed to make directory", log.Error(err))
 			return err
 		}
 		f, err := os.Create(cli.cfg.Limit.Path)
 		defer f.Close()
 		if err != nil {
-			cli.log.Error("failed to make file", log.Any("limitPath", cli.cfg.Limit.Path))
+			cli.log.Error("failed to make file", log.Error(err))
 			return err
 		}
 	}
 	utils.LoadYAML(cli.cfg.Limit.Path, &cli.stats)
 	p, err := ants.NewPoolWithFunc(cli.cfg.Pool.Worker, cli.call, ants.WithExpiryDuration(cli.cfg.Pool.Idletime))
 	if err != nil {
-		cli.log.Error("failed to create a pool", log.Any("error message", err.Error()))
+		cli.log.Error("failed to create a pool", log.Error(err))
 		return err
 	}
 	cli.pool = p
