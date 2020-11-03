@@ -31,7 +31,7 @@ func NewRuler(ctx context.Context, rule RuleInfo, targets map[string]*Client) (*
 	mqttCfg.CleanSession = false
 	mqttCfg.Subscriptions = []mqtt.QOSTopic{
 		{
-			QOS:   uint32(rule.Source.QOS),
+			QOS:   rule.Source.QOS,
 			Topic: rule.Source.Topic,
 		},
 	}

@@ -1,50 +1,46 @@
 package main
 
-//
-//import (
-//	"io/ioutil"
-//	"os"
-//	"path"
-//	"testing"
-//	"time"
-//
-//	"github.com/baetyl/baetyl/protocol/mqtt"
-//	"github.com/stretchr/testify/assert"
-//)
-//
-//func newStorageClient(r report) (*StorageClient, error) {
-//	cfg.Kind = Kind("S3")
-//	cfg.Region = "us-east-1"
-//	storageClient, err := NewStorageClient(*cfg, r)
-//	return storageClient, err
-//}
-//
-//func generateTempPath(prefix string) (string, error) {
-//	dir, err := ioutil.TempDir("", prefix)
-//	if err != nil {
-//		return "", err
-//	}
-//	tmpfile, err := ioutil.TempFile(dir, prefix)
-//	if err != nil {
-//		return "", err
-//	}
-//	fpath := tmpfile.Name() + ".yml"
-//	return fpath, nil
-//}
-//
-//func TestNewStorageClient(t *testing.T) {
-//	// round 1: report is not nil
-//	storageClient, err := newStorageClient(r)
-//	assert.Nil(t, err)
-//	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
-//	assert.Equal(t, "test", storageClient.cfg.Name)
-//
-//	// round 2: report is nil
-//	storageClient, err = newStorageClient(nil)
-//	assert.Nil(t, err)
-//	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
-//	assert.Equal(t, "test", storageClient.cfg.Name)
-//}
+
+import (
+	"io/ioutil"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func newClient() (*Client, error) {
+	cfg.Kind = "S3"
+	cfg.Region = "us-east-1"
+	storageClient, err := NewClient(*cfg)
+	return storageClient, err
+}
+
+func generateTempPath(prefix string) (string, error) {
+	dir, err := ioutil.TempDir("", prefix)
+	if err != nil {
+		return "", err
+	}
+	tmpfile, err := ioutil.TempFile(dir, prefix)
+	if err != nil {
+		return "", err
+	}
+	fpath := tmpfile.Name() + ".yml"
+	return fpath, nil
+}
+
+func TestNewStorageClient(t *testing.T) {
+	// round 1: report is not nil
+	storageClient, err := newClient()
+	assert.Nil(t, err)
+	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
+	assert.Equal(t, "test", storageClient.cfg.Name)
+
+	// round 2: report is nil
+	storageClient, err = newClient()
+	assert.Nil(t, err)
+	assert.Equal(t, Kind("S3"), storageClient.cfg.Kind)
+	assert.Equal(t, "test", storageClient.cfg.Name)
+}
 //
 //// CallAsync and invoke
 //func TestCallAsync(t *testing.T) {

@@ -26,29 +26,34 @@ type Config struct {
 
 // ClientInfo client config
 type ClientInfo struct {
-	Name      string        `yaml:"name" json:"name" validate:"nonzero"`
-	Kind      Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
-	Endpoint  string        `yaml:"endpoint" json:"endpoint"`
-	Region    string        `yaml:"region" json:"region" default:"us-east-1"`
-	Ak        string        `yaml:"ak" json:"ak" validate:"nonzero"`
-	Sk        string        `yaml:"sk" json:"sk" validate:"nonzero"`
-	Bucket    string        `yaml:"bucket" json:"bucket" validate:"nonzero"`
-	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
-	Timeout   time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
-	Backoff   Backoff       `yaml:"backoff" json:"backoff"`
-	Pool      Pool          `yaml:"pool" json:"pool"`
-	MultiPart MultiPart     `yaml:"multipart" json:"multipart"`
-	Limit     Limit         `yaml:"limit" json:"limit"`
-	Record    struct {
+	ObjectConfig `yaml:",inline" json:",inline"`
+	Name         string        `yaml:"name" json:"name" validate:"nonzero"`
+	Kind         Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
+	TempPath     string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
+	Timeout      time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
+	Backoff      Backoff       `yaml:"backoff" json:"backoff"`
+	Pool         Pool          `yaml:"pool" json:"pool"`
+	MultiPart    MultiPart     `yaml:"multipart" json:"multipart"`
+	Limit        Limit         `yaml:"limit" json:"limit"`
+	Record       struct {
 		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
 	} `yaml:"record" json:"record"`
+}
+
+// ObjectConfig (BOS、AWSS3) client config
+type ObjectConfig struct {
+	Endpoint string `yaml:"endpoint" json:"endpoint"`
+	Region   string `yaml:"region" json:"region" default:"us-east-1"`
+	Ak       string `yaml:"ak" json:"ak" validate:"nonzero"`
+	Sk       string `yaml:"sk" json:"sk" validate:"nonzero"`
+	Bucket   string `yaml:"bucket" json:"bucket" validate:"nonzero"`
 }
 
 // RuleInfo rule info
 type RuleInfo struct {
 	Name   string `yaml:"name" json:"name" validate:"nonzero"`
 	Source struct {
-		QOS   int    `yaml:"qos" json:"qos" validate:"min=0, max=1"`
+		QOS   uint32 `yaml:"qos" json:"qos" validate:"min=0, max=1"`
 		Topic string `yaml:"topic" json:"topic" validate:"nonzero"`
 	} `yaml:"source" json:"source" validate:"nonzero"`
 	Target struct {

@@ -1,6 +1,5 @@
 package main
 
-
 import (
 	"testing"
 	"time"
@@ -53,7 +52,7 @@ func TestNewBosHandler(t *testing.T) {
 }
 
 func TestPutObjectFromFile(t *testing.T) {
-	cfg.Kind = Kind("S3")
+	cfg.Kind = "S3"
 	cfg.Region = "us-east-2"
 	cfg.MultiPart.PartSize = 1048576000
 	cfg.MultiPart.Concurrency = 10
@@ -70,7 +69,7 @@ func TestPutObjectFromFile(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
-	cfg.Kind = Kind("S3")
+	cfg.Kind = "S3"
 	sc := mock.NewMockClient()
 	u := s3manager.NewUploader(unit.Session)
 	s3Handler := &S3Handler{
@@ -80,6 +79,7 @@ func TestFileExists(t *testing.T) {
 	}
 	md5, err := utils.CalculateFileMD5("example/test/baetyl/service.yml")
 	assert.Nil(t, err)
-	rlt := s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
+	rlt, err := s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
+	assert.NoError(t, err)
 	assert.Equal(t, false, rlt)
 }

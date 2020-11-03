@@ -1,0 +1,31 @@
+clients:
+  - name: minio
+    kind: S3
+    endpoint: http://127.0.0.1:8080
+    ak: XXXXXXXXXXXXXXXXXXXXXXXX
+    sk: XXXXXXXXXXXXXXXXXXXXXXXX
+    multipart:
+      partsize: 10m
+      concurrency: 10
+    pool:
+      worker: 1000
+      idletime: 30s
+    bucket: bos-remote-demo
+    temppath: var/lib/baetyl/tmp
+    # max 1000g
+    limit:
+      enable: true
+      data: 9g
+      path: var/lib/baetyl/data/stats.yml
+
+rules:
+  - name: rule3
+    source:
+      topic: broker/topic3
+      qos: 1
+    target:
+      client: minio
+
+logger:
+  path: var/log/baetyl/service.log
+  level: "debug"
