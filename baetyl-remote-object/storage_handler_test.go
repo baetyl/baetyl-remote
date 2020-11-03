@@ -1,16 +1,27 @@
 package main
 
+
 import (
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/awstesting/mock"
 	"github.com/aws/aws-sdk-go/awstesting/unit"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/baetyl/baetyl/utils"
+	"github.com/baetyl/baetyl-go/v2/utils"
 	"github.com/docker/distribution/uuid"
 	"github.com/stretchr/testify/assert"
 )
+
+var cfg = &ClientInfo{
+	Name: "test",
+	Record: struct {
+		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
+	}{
+		Interval: time.Duration(1000000000),
+	},
+}
 
 func TestNewBosHandler(t *testing.T) {
 	// var bosHandler *BosHandler

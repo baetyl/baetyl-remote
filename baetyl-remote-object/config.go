@@ -4,7 +4,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/baetyl/baetyl/protocol/mqtt"
+	"github.com/baetyl/baetyl-go/v2/errors"
 	"github.com/docker/go-units"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -14,15 +14,46 @@ type Kind string
 
 // The type of event from cloud
 const (
-	Bos  Kind = "BOS"
-	Ceph Kind = "CEPH"
-	S3   Kind = "S3"
+	Bos Kind = "BOS"
+	S3  Kind = "S3"
 )
 
-// Config config of module
+// Config config of rule
 type Config struct {
-	Clients []ClientInfo `yaml:"clients" json:"clients" default:"[]"`
-	Rules   []Rule       `yaml:"rules" json:"rules" default:"[]"`
+	Clients []ClientInfo `yaml:"clients" json:"clients"`
+	Rules   []RuleInfo   `yaml:"rules" json:"rules"`
+}
+
+// ClientInfo client config
+type ClientInfo struct {
+	Name      string        `yaml:"name" json:"name" validate:"nonzero"`
+	Kind      Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
+	Endpoint  string        `yaml:"endpoint" json:"endpoint"`
+	Region    string        `yaml:"region" json:"region" default:"us-east-1"`
+	Ak        string        `yaml:"ak" json:"ak" validate:"nonzero"`
+	Sk        string        `yaml:"sk" json:"sk" validate:"nonzero"`
+	Bucket    string        `yaml:"bucket" json:"bucket" validate:"nonzero"`
+	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
+	Timeout   time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
+	Backoff   Backoff       `yaml:"backoff" json:"backoff"`
+	Pool      Pool          `yaml:"pool" json:"pool"`
+	MultiPart MultiPart     `yaml:"multipart" json:"multipart"`
+	Limit     Limit         `yaml:"limit" json:"limit"`
+	Record    struct {
+		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
+	} `yaml:"record" json:"record"`
+}
+
+// RuleInfo rule info
+type RuleInfo struct {
+	Name   string `yaml:"name" json:"name" validate:"nonzero"`
+	Source struct {
+		QOS   int    `yaml:"qos" json:"qos" validate:"min=0, max=1"`
+		Topic string `yaml:"topic" json:"topic" validate:"nonzero"`
+	} `yaml:"source" json:"source" validate:"nonzero"`
+	Target struct {
+		Client string `yaml:"client" json:"client" default:"baetyl-broker"`
+	} `yaml:"target" json:"target"`
 }
 
 // Backoff policy
@@ -36,37 +67,6 @@ type Backoff struct {
 type Pool struct {
 	Worker   int           `yaml:"worker" json:"worker" default:"1000"`    // max worker size
 	Idletime time.Duration `yaml:"idletime" json:"idletime" default:"30s"` // delay time
-}
-
-// ClientInfo client config
-type ClientInfo struct {
-	Name      string        `yaml:"name" json:"name" validate:"nonzero"`
-	Address   string        `yaml:"address" json:"address"`
-	Region    string        `yaml:"region" json:"region" default:"us-east-1"`
-	Ak        string        `yaml:"ak" json:"ak" validate:"nonzero"`
-	Sk        string        `yaml:"sk" json:"sk" validate:"nonzero"`
-	Kind      Kind          `yaml:"kind" json:"kind" validate:"nonzero"`
-	Timeout   time.Duration `yaml:"timeout" json:"timeout" default:"30s"`
-	Backoff   Backoff       `yaml:"backoff" json:"backoff"`
-	Pool      Pool          `yaml:"pool" json:"pool"`
-	Bucket    string        `yaml:"bucket" json:"bucket" validate:"nonzero"`
-	TempPath  string        `yaml:"temppath" json:"temppath" default:"var/lib/baetyl/tmp"`
-	MultiPart MultiPart     `yaml:"multipart" json:"multipart"`
-	Limit     Limit         `yaml:"limit" json:"limit"`
-	Report    struct {
-		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
-	} `yaml:"report" json:"report"`
-}
-
-// Rule function rule config
-type Rule struct {
-	Hub struct {
-		ClientID      string           `yaml:"clientid" json:"clientid"`
-		Subscriptions []mqtt.TopicInfo `yaml:"subscriptions" json:"subscriptions" default:"[]"`
-	} `yaml:"hub" json:"hub"`
-	Client struct {
-		Name string `yaml:"name" json:"name" validate:"nonzero"`
-	} `yaml:"client" json:"client"`
 }
 
 // MultiPart config
@@ -150,11 +150,11 @@ type Stats struct {
 func DumpYAML(path string, in interface{}) error {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	err = ioutil.WriteFile(path, bytes, 0755)
 	if err != nil {
-		return err
+		return errors.Trace(err)
 	}
 	return nil
 }
