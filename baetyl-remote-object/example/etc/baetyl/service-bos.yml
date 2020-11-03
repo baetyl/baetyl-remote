@@ -1,13 +1,9 @@
-hub:
-  address: tcp://127.0.0.1:1883
-  username: test
-  password: hahaha
 clients:
-  - name: baidu-bos
-    address: bj.bcebos.com
+  - name: baidubos # 名称
+    kind: BOS # mqtt 类型
+    endpoint: bj.bcebos.com # 地址
     ak: XXXXXXXXXXXXXXXXXXXXXXXXXX
     sk: XXXXXXXXXXXXXXXXXXXXXXXXXX
-    kind: BOS
     multipart:
       partsize: 10m
       concurrency: 10
@@ -21,14 +17,15 @@ clients:
       enable: true
       data: 9g
       path: var/lib/baetyl/data/stats.yml
+
 rules:
-  - hub:
-      clientid: remote-write-bos
-      subscriptions:
-        # hub topic
-        - topic: t
-    client:
-      name: baidu-bos
+  - name: rule1 # 规则名称，必须保持唯一
+    source: # 消息源
+      topic: broker/topic1 # 消息主题
+      qos: 1 # 消息质量
+    target: # 消息目的地
+      client: baidubos # object 目标节点
+
 logger:
   path: var/log/baetyl/service.log
   level: "debug"

@@ -1,7 +1,7 @@
 clients:
-  - name: awss3
+  - name: minio
     kind: S3
-    region: us-east-2
+    endpoint: http://127.0.0.1:8080
     ak: XXXXXXXXXXXXXXXXXXXXXXXX
     sk: XXXXXXXXXXXXXXXXXXXXXXXX
     multipart:
@@ -19,12 +19,12 @@ clients:
       path: var/lib/baetyl/data/stats.yml
 
 rules:
-  - name: rule2
+  - name: rule3
     source:
-      topic: broker/topic2
+      topic: broker/topic3
       qos: 1
     target:
-      client: awss3
+      client: minio
 
 logger:
   path: var/log/baetyl/service.log
