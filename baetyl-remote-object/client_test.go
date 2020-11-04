@@ -338,7 +338,7 @@ func TestStartAndClose(t *testing.T) {
 	// create storage client
 	_, err = newClient()
 	assert.NotNil(t, err)
-	assert.Equal(t, "failed to make dir (/usr/data.yml): mkdir /usr/data.yml: operation not permitted", err.Error())
+	assert.Contains(t, err.Error(), "failed to make dir (/usr/data.yml)")
 
 	// cannot make directory of limit path
 	dir, err := ioutil.TempDir("", "example")
@@ -349,7 +349,7 @@ func TestStartAndClose(t *testing.T) {
 	// create storage client
 	_, err = newClient()
 	assert.NotNil(t, err)
-	assert.Equal(t, "failed to make dir (/var/file): mkdir /var/file: permission denied", err.Error())
+	assert.Contains(t, err.Error(), "failed to make dir (/var/file)")
 
 	// invalid size for pool
 	cfg.Pool.Worker = 0
