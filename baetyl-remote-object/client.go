@@ -18,19 +18,6 @@ import (
 	"github.com/panjf2000/ants"
 )
 
-type arch interface {
-	// Archive archivies an archive file on disk
-	Archive(source []string, destination string) error
-}
-
-// nonArch origin file
-type nonArch struct{}
-
-// Archive no action
-func (a *nonArch) Archive(source []string, destination string) error {
-	return nil
-}
-
 // Task StorageClient
 type Task struct {
 	msg *EventMessage
@@ -52,7 +39,7 @@ type Client struct {
 	stats   Stats
 	pwd     string
 	fs      *FileStats
-	arch    arch
+	arch    archiver.Archiver
 	log     *log.Logger
 	pool    *ants.PoolWithFunc
 	lock    sync.Mutex
@@ -73,7 +60,6 @@ func NewClient(cfg ClientInfo) (*Client, error) {
 		cfg:     cfg,
 		pwd:     pwd,
 		handler: handler,
-		arch:    &nonArch{},
 		fs:      &FileStats{},
 		log:     log.With(log.Any("client", cfg.Name)),
 	}
@@ -235,13 +221,16 @@ func (cli *Client) handleUploadEvent(e *UploadEvent) error {
 		atomic.AddUint64(&cli.fs.deleted, 1)
 		return errors.Errorf("failed to find path: %s", p)
 	}
-	err = cli.arch.Archive([]string{p}, t)
 	if t != p {
 		defer os.RemoveAll(t)
 	}
-	if err != nil {
-		return errors.Errorf("failed to zip/tar dir: %s", err.Error())
+
+	if cli.arch != nil {
+		if err := cli.arch.Archive([]string{p}, t); err != nil {
+			return errors.Errorf("failed to zip/tar dir: %s", err.Error())
+		}
 	}
+
 	return cli.upload(t, e.RemotePath, e.Meta)
 }
 
