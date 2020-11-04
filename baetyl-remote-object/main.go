@@ -1,59 +1,45 @@
 package main
 
 import (
-	"fmt"
-
-	baetyl "github.com/baetyl/baetyl/sdk/baetyl-go"
+	"github.com/baetyl/baetyl-go/v2/context"
 )
 
-// mo bridge module of mqtt servers
-type mo struct {
-	cfg Config
-	rrs []*Ruler
-}
-
 func main() {
-	baetyl.Run(func(ctx baetyl.Context) error {
+	context.Run(func(ctx context.Context) error {
 		var cfg Config
-		err := ctx.LoadConfig(&cfg)
+		err := ctx.LoadCustomConfig(&cfg)
 		if err != nil {
 			return err
 		}
+
 		// clients
-		clients := make(map[string]Client)
-		for _, c := range cfg.Clients {
-			clients[c.Name], err = NewClient(c, ctx.ReportInstance)
-			defer clients[c.Name].Close()
-			if err != nil {
-				return err
-			}
-		}
-		// rulers
-		rulers := make([]*Ruler, 0)
-		for _, rule := range cfg.Rules {
-			cli, ok := clients[rule.Client.Name]
-			if !ok {
-				return fmt.Errorf("client (%s) not found", rule.Client.Name)
-			}
-			ruler := NewRuler(rule, ctx.Config().Hub, cli)
-			rulers = append(rulers, ruler)
-		}
+		clients := make(map[string]*Client)
 		defer func() {
-			for _, ruler := range rulers {
-				ruler.Close()
+			for _, c := range clients {
+				c.Close()
 			}
 		}()
-		for _, cli := range clients {
-			err := cli.Start()
+		for _, c := range cfg.Clients {
+			client, err := NewClient(c)
 			if err != nil {
 				return err
 			}
+			clients[c.Name] = client
 		}
-		for _, ruler := range rulers {
-			err := ruler.Start()
+
+		// rulers
+		rulers := make([]*Ruler, 0)
+		defer func() {
+			for _, r := range rulers {
+				r.Close()
+			}
+		}()
+		for _, ruleInfo := range cfg.Rules {
+			ruler, err := NewRuler(ruleInfo, clients, ctx.ServiceName())
 			if err != nil {
 				return err
 			}
+			rulers = append(rulers, ruler)
 		}
 		ctx.Wait()
 		return nil

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/baetyl/baetyl/utils"
+	"github.com/baetyl/baetyl-go/v2/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,8 +18,8 @@ func TestConfig(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Len(t, c.Clients, 1)
-	assert.Equal(t, "baidu-bos", c.Clients[0].Name)
-	assert.Equal(t, "bj.bcebos.com", c.Clients[0].Address)
+	assert.Equal(t, "baidubos", c.Clients[0].Name)
+	assert.Equal(t, "bj.bcebos.com", c.Clients[0].Endpoint)
 	assert.Equal(t, Kind("BOS"), c.Clients[0].Kind)
 	assert.Equal(t, int64(10485760), c.Clients[0].MultiPart.PartSize)
 	assert.Equal(t, 10, c.Clients[0].MultiPart.Concurrency)
@@ -30,11 +30,12 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, true, c.Clients[0].Limit.Enable)
 	assert.Equal(t, int64(9663676416), c.Clients[0].Limit.Data)
 	assert.Equal(t, "var/lib/baetyl/data/stats.yml", c.Clients[0].Limit.Path)
-	assert.Equal(t, time.Duration(60000000000), c.Clients[0].Report.Interval)
+	assert.Equal(t, time.Duration(60000000000), c.Clients[0].Record.Interval)
 
 	assert.Len(t, c.Rules, 1)
-	assert.Equal(t, "remote-write-bos", c.Rules[0].Hub.ClientID)
-	assert.Equal(t, "t", c.Rules[0].Hub.Subscriptions[0].Topic)
+	assert.Equal(t, uint32(1), c.Rules[0].Source.QOS)
+	assert.Equal(t, "broker/topic1", c.Rules[0].Source.Topic)
+	assert.Equal(t, "baidubos", c.Rules[0].Target.Client)
 
 	// round 2: load bad configuration yaml file
 	err = utils.LoadYAML("example/test/baetyl/service.yml", &c)
