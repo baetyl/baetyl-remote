@@ -35,7 +35,7 @@ func main() {
 			}
 		}()
 		for _, ruleInfo := range cfg.Rules {
-			ruler, err := NewRuler(ctx, ruleInfo, clients)
+			ruler, err := NewRuler(ruleInfo, clients, ctx.ServiceName())
 			if err != nil {
 				return err
 			}

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/256dpi/gomqtt/packet"
-	"github.com/baetyl/baetyl-go/v2/context"
 	"github.com/baetyl/baetyl-go/v2/errors"
 	"github.com/baetyl/baetyl-go/v2/log"
 	"github.com/baetyl/baetyl-go/v2/mqtt"
@@ -20,14 +19,14 @@ type Ruler struct {
 }
 
 // NewRuler can create a ruler
-func NewRuler(ctx context.Context, rule RuleInfo, targets map[string]*Client) (*Ruler, error) {
+func NewRuler(rule RuleInfo, targets map[string]*Client, serviceName string) (*Ruler, error) {
 	targetCli, ok := targets[rule.Target.Client]
 	if !ok {
 		return nil, errors.Errorf("client (%s) not found", rule.Target.Client)
 	}
 
 	mqttCfg := mqtt.NewClientOptions()
-	mqttCfg.ClientID = fmt.Sprintf("%s-rule-%s", ctx.ServiceName(), rule.Name)
+	mqttCfg.ClientID = fmt.Sprintf("%s-rule-%s", serviceName, rule.Name)
 	mqttCfg.Address = "tcp://baetyl-broker:1883"
 	mqttCfg.CleanSession = false
 	mqttCfg.Subscriptions = []mqtt.Subscription{
