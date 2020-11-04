@@ -69,7 +69,6 @@ func TestPutObjectFromFile(t *testing.T) {
 }
 
 func TestFileExists(t *testing.T) {
-	cfg.Kind = "S3"
 	sc := mock.NewMockClient()
 	u := s3manager.NewUploader(unit.Session)
 	s3Handler := &S3Handler{
@@ -77,9 +76,8 @@ func TestFileExists(t *testing.T) {
 		uploader: u,
 		cfg:      *cfg,
 	}
-	md5, err := utils.CalculateFileMD5("example/test/baetyl/service.yml")
+	md5, err := utils.CalculateFileMD5("example/etc/baetyl/service-bos.yml")
 	assert.Nil(t, err)
-	rlt, err := s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
-	assert.NoError(t, err)
-	assert.Equal(t, false, rlt)
+	_, err = s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
+	assert.Equal(t, err.Error(), "MissingRegion: could not find region configuration")
 }

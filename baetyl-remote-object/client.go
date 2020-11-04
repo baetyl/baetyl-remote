@@ -185,9 +185,11 @@ func (cli *Client) upload(f, remotePath string, meta map[string]string) error {
 func (cli *Client) putObjectWithStats(bucket, remotePath, f string, meta map[string]string) error {
 	err := cli.handler.PutObjectFromFile(bucket, remotePath, f, meta)
 	if err != nil {
+		cli.log.Error("failed to put object from file", log.Any("localFile", f), log.Any("remotePath", remotePath), log.Any("bucket", bucket), log.Error(err))
 		atomic.AddUint64(&cli.fs.fail, 1)
 		return errors.Trace(err)
 	}
+	cli.log.Info("put object from file successfully", log.Any("localFile", f), log.Any("remotePath", remotePath), log.Any("bucket", bucket))
 	atomic.AddUint64(&cli.fs.success, 1)
 	return nil
 }

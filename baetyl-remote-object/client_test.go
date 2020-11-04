@@ -128,6 +128,7 @@ func TestCall(t *testing.T) {
 func TestUpload(t *testing.T) {
 	cfg.Kind = "S3"
 	cfg.Region = "us-east-1"
+	cfg.Bucket = "default"
 
 	tempPath, err := generateTempPath("example")
 	defer os.RemoveAll(path.Dir(tempPath))
@@ -149,9 +150,9 @@ func TestUpload(t *testing.T) {
 	defer storageClient.Close()
 
 	// round 1: local file is not exist
-	err = storageClient.upload("var/test/file", "", map[string]string{})
+	err = storageClient.upload("var/test/file", "default", map[string]string{})
 	assert.NotNil(t, err)
-	assert.Equal(t, "open var/test/file: no such file or directory", err.Error())
+	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error())
 
 	// round 2: file exists without limit data
 	storageClient.cfg.Bucket = "Bucket"
@@ -159,7 +160,7 @@ func TestUpload(t *testing.T) {
 	storageClient.cfg.MultiPart.Concurrency = 10
 	err = storageClient.upload("./example/etc/baetyl/service-bos.yml", "var/file/service.yml", map[string]string{})
 	assert.NotNil(t, err)
-	assert.Equal(t, "RequestCanceled: request context canceled\ncaused by: context deadline exceeded", err.Error()) // without AccessKey and SecretKey
+	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
 
 	// round 3: file exists with limit data
 	storageClient.cfg.Limit.Enable = true
@@ -172,7 +173,7 @@ func TestUpload(t *testing.T) {
 		}}
 	err = storageClient.upload("./example/test/baetyl/service.yml", "var/file/service.yml", map[string]string{})
 	assert.NotNil(t, err)
-	assert.Equal(t, "RequestCanceled: request context canceled\ncaused by: context deadline exceeded", err.Error()) // without AccessKey and SecretKey
+	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
 }
 
 func TestHandleUploadEvent(t *testing.T) {
@@ -218,7 +219,7 @@ func TestHandleUploadEvent(t *testing.T) {
 	storageClient.cfg.MultiPart.Concurrency = 10
 	err = storageClient.handleUploadEvent(e)
 	assert.NotNil(t, err)
-	assert.Equal(t, "RequestCanceled: request context canceled\ncaused by: context deadline exceeded", err.Error()) // without AccessKey and SecretKey
+	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
 
 	// zip is true, upload file
 	e.Zip = true
@@ -244,6 +245,7 @@ func TestHandleUploadEvent(t *testing.T) {
 func TestCheckFile(t *testing.T) {
 	cfg.Kind = "S3"
 	cfg.Region = "us-east-1"
+	cfg.Bucket = "default"
 
 	tempPath, err := generateTempPath("example")
 	defer os.RemoveAll(path.Dir(tempPath))
@@ -268,7 +270,7 @@ func TestCheckFile(t *testing.T) {
 	md5 := "4a0fb0ea68b05a84234e420d1f8cb32b"
 
 	rlt, err := storageClient.checkFile(remotePath, md5)
-	assert.NoError(t, err)
+	assert.Equal(t, err.Error(), "EmptyStaticCreds: static credentials are empty")
 	assert.Equal(t, false, rlt)
 }
 

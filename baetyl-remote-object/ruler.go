@@ -25,17 +25,7 @@ func NewRuler(rule RuleInfo, targets map[string]*Client, serviceName string) (*R
 		return nil, errors.Errorf("client (%s) not found", rule.Target.Client)
 	}
 
-	mqttCfg := mqtt.NewClientOptions()
-	mqttCfg.ClientID = fmt.Sprintf("%s-rule-%s", serviceName, rule.Name)
-	mqttCfg.Address = "tcp://baetyl-broker:1883"
-	mqttCfg.CleanSession = false
-	mqttCfg.Subscriptions = []mqtt.Subscription{
-		{
-			QOS:   mqtt.QOS(rule.Source.QOS),
-			Topic: rule.Source.Topic,
-		},
-	}
-	mqttCli := mqtt.NewClient(mqttCfg)
+	mqttCli := getBrokerClient(rule.Source.QOS, rule.Source.Topic, fmt.Sprintf("%s-rule-%s", serviceName, rule.Name))
 	ruler := &Ruler{
 		sourceCli: mqttCli,
 		targetCli: targetCli,
@@ -116,4 +106,18 @@ func (r *Ruler) callback(msg *EventMessage, err error) {
 	if err != nil {
 		r.log.Error("failed to invoke object client", log.Error(err))
 	}
+}
+
+func getBrokerClient(qos uint32, topic, clientID string) *mqtt.Client {
+	mqttCfg := mqtt.NewClientOptions()
+	mqttCfg.ClientID = clientID
+	mqttCfg.Address = "tcp://baetyl-broker:1883"
+	mqttCfg.CleanSession = false
+	mqttCfg.Subscriptions = []mqtt.Subscription{
+		{
+			QOS:   mqtt.QOS(qos),
+			Topic: topic,
+		},
+	}
+	return mqtt.NewClient(mqttCfg)
 }
