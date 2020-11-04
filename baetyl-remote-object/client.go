@@ -18,10 +18,12 @@ import (
 	"github.com/panjf2000/ants"
 )
 
+type ruleHook func(msg *EventMessage, err error)
+
 // Task StorageClient
 type Task struct {
 	msg *EventMessage
-	cb  func(msg *EventMessage, err error)
+	cb  ruleHook
 }
 
 // FileStats upload stats
@@ -96,7 +98,7 @@ func NewClient(cfg ClientInfo) (*Client, error) {
 }
 
 // CallAsync submit task
-func (cli *Client) CallAsync(msg *EventMessage, cb func(msg *EventMessage, err error)) error {
+func (cli *Client) CallAsync(msg *EventMessage, cb ruleHook) error {
 	if cli.pool.Running() == cli.cfg.Pool.Worker {
 		cb(msg, errors.New("failed to submit task: no worker can be used"))
 		return nil

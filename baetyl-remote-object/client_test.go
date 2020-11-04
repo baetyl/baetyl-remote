@@ -70,11 +70,12 @@ func TestCallAsync(t *testing.T) {
 			Content: nil,
 		},
 	}
-	callback := func(msg *EventMessage, err error) {
-		return
-	}
-	err = storageClient.CallAsync(msg, callback)
+	err = storageClient.CallAsync(msg, mockRuleHook)
 	assert.Nil(t, err)
+}
+
+func mockRuleHook(msg *EventMessage, err error) {
+	return
 }
 
 func TestCall(t *testing.T) {
@@ -100,10 +101,6 @@ func TestCall(t *testing.T) {
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
-	callback := func(msg *EventMessage, err error) {
-		return
-	}
-
 	task1 := &Task{
 		msg: &EventMessage{
 			ID:    1,
@@ -115,7 +112,7 @@ func TestCall(t *testing.T) {
 				Content: nil,
 			},
 		},
-		cb: callback,
+		cb: mockRuleHook,
 	}
 	// start call
 	storageClient.call(task1)
