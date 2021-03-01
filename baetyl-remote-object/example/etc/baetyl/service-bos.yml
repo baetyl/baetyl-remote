@@ -1,0 +1,31 @@
+clients:
+  - name: baidubos # 名称
+    kind: BOS # mqtt 类型
+    endpoint: bj.bcebos.com # 地址
+    ak: XXXXXXXXXXXXXXXXXXXXXXXXXX
+    sk: XXXXXXXXXXXXXXXXXXXXXXXXXX
+    multipart:
+      partsize: 10m
+      concurrency: 10
+    pool:
+      worker: 1000
+      idletime: 30s
+    bucket: bos-remote-demo
+    temppath: var/lib/baetyl/tmp
+    # max 1000g
+    limit:
+      enable: true
+      data: 9g
+      path: var/lib/baetyl/data/stats.yml
+
+rules:
+  - name: rule1 # 规则名称，必须保持唯一
+    source: # 消息源
+      topic: broker/topic1 # 消息主题
+      qos: 1 # 消息质量
+    target: # 消息目的地
+      client: baidubos # object 目标节点
+
+logger:
+  path: var/log/baetyl/service.log
+  level: "debug"

@@ -1,0 +1,21 @@
+hub:
+  address: tcp://127.0.0.1:1883
+  username: test
+  password: hahaha
+clients:
+  - name: baidu-bos
+    kind: BOS
+    limit:
+      enable: true
+      data: 10a
+      path: var/lib/baetyl/data/stats.yml
+rules:
+  - hub:
+      clientid: remote-write-bos
+      subscriptions:
+        - topic: t
+    client:
+      name: baidu-bos
+logger:
+  path: var/log/baetyl/service.log
+  level: "debug"

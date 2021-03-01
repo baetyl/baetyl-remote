@@ -4,7 +4,12 @@
 *.dll
 *.so
 *.dylib
-
+/.idea
+/.vscode
+/**/coverage.*
+/**/.DS_Store
+/**/*.log
+/vendor
 # Test binary, build with `go test -c`
 *.test
 
@@ -34,3 +39,6 @@
 /**/node_modules
 /**/__package
 docs/_build
+baetyl-remote-object
+/**/baetyl-remote-object
+/**/output/
