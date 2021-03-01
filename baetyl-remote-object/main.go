@@ -1,45 +1,62 @@
 package main
 
 import (
-	"github.com/baetyl/baetyl-go/v2/context"
+	"fmt"
+
+	"github.com/baetyl/baetyl-go/context"
 )
+
+// mo bridge module of mqtt servers
+type mo struct {
+	cfg Config
+	rrs []*Ruler
+}
 
 func main() {
 	context.Run(func(ctx context.Context) error {
 		var cfg Config
-		err := ctx.LoadCustomConfig(&cfg)
+		err := ctx.LoadConfig(&cfg)
 		if err != nil {
 			return err
 		}
-
-		// clients
-		clients := make(map[string]*Client)
-		defer func() {
-			for _, c := range clients {
-				c.Close()
-			}
-		}()
+		// http clients
+		clients := make(map[string]Client)
 		for _, c := range cfg.Clients {
-			client, err := NewClient(c)
+			clients[c.Name], err = NewClient(c)
+			defer clients[c.Name].Close()
 			if err != nil {
 				return err
 			}
-			clients[c.Name] = client
 		}
-
 		// rulers
 		rulers := make([]*Ruler, 0)
+		for _, rule := range cfg.Rules {
+			cli, ok := clients[rule.Client.Name]
+			if !ok {
+				return fmt.Errorf("client (%s) not found", rule.Client.Name)
+			}
+			ruler, err := NewRuler(rule, cli)
+			if err != nil {
+				return fmt.Errorf("failed to create ruler")
+			}
+			rulers = append(rulers, ruler)
+		}
 		defer func() {
-			for _, r := range rulers {
-				r.Close()
+			for _, ruler := range rulers {
+				ruler.Close()
 			}
 		}()
-		for _, ruleInfo := range cfg.Rules {
-			ruler, err := NewRuler(ruleInfo, clients, ctx.ServiceName())
+		for _, cli := range clients {
+			err := cli.Start()
 			if err != nil {
 				return err
 			}
-			rulers = append(rulers, ruler)
+		}
+		for _, ruler := range rulers {
+			err := ruler.Start(ctx.Config().Mqtt)
+			if err != nil {
+				return err
+			}
 		}
 		ctx.Wait()
 		return nil

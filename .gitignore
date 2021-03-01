@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-/.idea
+/**/.idea
 /.vscode
 /**/coverage.*
 /**/.DS_Store
@@ -39,6 +39,6 @@
 /**/node_modules
 /**/__package
 docs/_build
-baetyl-remote-object
-/**/baetyl-remote-object
 /**/output/
+/**/var
+/**/etc/baetyl

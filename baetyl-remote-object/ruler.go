@@ -4,77 +4,99 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/256dpi/gomqtt/packet"
-	"github.com/baetyl/baetyl-go/v2/errors"
-	"github.com/baetyl/baetyl-go/v2/log"
-	"github.com/baetyl/baetyl-go/v2/mqtt"
+	"github.com/baetyl/baetyl-go/log"
+	"github.com/baetyl/baetyl-go/mqtt"
 )
 
 // Ruler struct
 type Ruler struct {
-	sourceCli *mqtt.Client
-	targetCli *Client
-	log       *log.Logger
-	tm        sync.Map
+	rule *Rule
+	cli  Client
+	hub  *mqtt.Client
+	log  *log.Logger
+	tm   sync.Map
 }
 
 // NewRuler can create a ruler
-func NewRuler(rule RuleInfo, targets map[string]*Client, serviceName string) (*Ruler, error) {
-	targetCli, ok := targets[rule.Target.Client]
-	if !ok {
-		return nil, errors.Errorf("client (%s) not found", rule.Target.Client)
-	}
-
-	mqttCli := getBrokerClient(rule.Source.QOS, rule.Source.Topic, fmt.Sprintf("%s-rule-%s", serviceName, rule.Name))
+func NewRuler(rule Rule, cli Client) (*Ruler, error) {
 	ruler := &Ruler{
-		sourceCli: mqttCli,
-		targetCli: targetCli,
-		log:       log.With(log.Any("rule", rule.Name)),
-	}
-	err := mqttCli.Start(mqtt.NewObserverWrapper(func(pkt *packet.Publish) error {
-		event, err := ruler.processEvent(pkt)
-		if err != nil {
-			ruler.log.Error("error occurred in ruler.processEvent", log.Error(err))
-			return nil
-		}
-		msg := &EventMessage{
-			ID:    uint64(pkt.ID),
-			QOS:   uint32(pkt.Message.QOS),
-			Topic: pkt.Message.Topic,
-			Event: event,
-		}
-		err = ruler.RuleHandler(msg)
-		if err != nil {
-			ruler.log.Error("error occurred in ruler.RuleHandler", log.Error(err))
-		}
-		return nil
-	}, func(*packet.Puback) error {
-		return nil
-	}, func(err error) {
-		ruler.log.Error("error occurs in source", log.Error(err))
-	}))
-	if err != nil {
-		ruler.log.Error("error occurred when mqtt client start", log.Error(err))
+		rule: &rule,
+		cli:  cli,
+		log:  log.With(log.Any("rule", rule.Client.Name)),
 	}
 	return ruler, nil
 }
 
 // Close can create a ruler
 func (r *Ruler) Close() {
-	r.log.Info("rule starts to close")
-	defer r.log.Info("rule closed")
-
-	// sourceCli is internal client
-	if r.sourceCli != nil {
-		r.sourceCli.Close()
-	}
+	r.hub.Close()
 }
 
-func (r *Ruler) processEvent(pkt *packet.Publish) (*Event, error) {
-	r.log.Debug("ruler received a event: ", log.Any("payload", string(pkt.Message.Payload)))
+// Start can create a ruler
+func (r *Ruler) Start(cc mqtt.ClientConfig) error {
+	defaults(r.rule, &cc)
+	hub, err := NewMQTTClient(cc, r, r.rule.Hub.Subscriptions)
+	if err != nil {
+		return fmt.Errorf("failed to create mqtt client: %s", err.Error())
+	}
+	r.hub = hub
+	return nil
+}
+
+// NewMQTTClient creates a mqtt client
+func NewMQTTClient(cc mqtt.ClientConfig, obs mqtt.Observer, topics []mqtt.QOSTopic) (*mqtt.Client, error) {
+	if cc.Address == "" {
+		return nil, fmt.Errorf("mqtt endpoint not configured")
+	}
+	cli, err := mqtt.NewClient(cc, obs)
+	if err != nil {
+		return nil, err
+	}
+	var subs []mqtt.Subscription
+	for _, topic := range topics {
+		subs = append(subs, mqtt.Subscription{Topic: topic.Topic, QOS: mqtt.QOS(topic.QOS)})
+	}
+	if len(subs) > 0 {
+		err = cli.Subscribe(subs)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cli, nil
+}
+
+// OnPublish create a ruler
+func (r *Ruler) OnPublish(pkt *mqtt.Publish) error {
+	event, err := r.processEvent(pkt)
+	if err != nil {
+		r.log.Error(err.Error())
+		return err
+	}
+	msg := &EventMessage{
+		ID:    uint64(pkt.ID),
+		QOS:   uint32(pkt.Message.QOS),
+		Topic: pkt.Message.Topic,
+		Event: event,
+	}
+	return r.RuleHandler(msg)
+}
+
+// OnPuback handles puback packet
+func (r *Ruler) OnPuback(pkt *mqtt.Puback) error {
+	return nil
+}
+
+// OnError handles error
+func (r *Ruler) OnError(err error) {
+	r.log.Error(err.Error())
+}
+
+// processEvent processes event
+func (r *Ruler) processEvent(pkt *mqtt.Publish) (*Event, error) {
+	r.log.Debug("start to process event")
 	e, err := NewEvent(pkt.Message.Payload)
 	if err != nil {
-		return nil, errors.Errorf("event invalid: %s", err.Error())
+		return nil, fmt.Errorf("event invalid: %s", err.Error())
 	}
 	return e, nil
 }
@@ -88,36 +110,23 @@ func (r *Ruler) RuleHandler(msg *EventMessage) error {
 			return nil
 		}
 	}
-	return r.targetCli.CallAsync(msg, r.callback)
+	return r.cli.CallAsync(msg, r.callback)
 }
 
 func (r *Ruler) callback(msg *EventMessage, err error) {
-	if msg.QOS == 1 {
-		if err == nil {
-			puback := packet.NewPuback()
-			puback.ID = packet.ID(msg.ID)
-			err := r.sourceCli.Send(puback)
-			if err != nil {
-				r.log.Error("failed to send mqtt msg", log.Error(err))
-			}
-		}
-		r.tm.Delete(msg.ID)
-	}
 	if err != nil {
-		r.log.Error("failed to invoke object client", log.Error(err))
+		r.log.Error(err.Error())
+	}
+	if msg.QOS == 1 && err == nil {
+		r.tm.Delete(msg.ID)
 	}
 }
 
-func getBrokerClient(qos uint32, topic, clientID string) *mqtt.Client {
-	mqttCfg := mqtt.NewClientOptions()
-	mqttCfg.ClientID = clientID
-	mqttCfg.Address = "tcp://baetyl-broker:1883"
-	mqttCfg.CleanSession = false
-	mqttCfg.Subscriptions = []mqtt.Subscription{
-		{
-			QOS:   mqtt.QOS(qos),
-			Topic: topic,
-		},
+// defaults sets clientID for mqtt client
+func defaults(rule *Rule, cc *mqtt.ClientConfig) {
+	if rule.Hub.ClientID != "" {
+		cc.ClientID = rule.Hub.ClientID
+	} else {
+		cc.ClientID = rule.Client.Name
 	}
-	return mqtt.NewClient(mqttCfg)
 }

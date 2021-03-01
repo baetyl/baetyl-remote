@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/baetyl/baetyl-go/v2/errors"
 	"github.com/baidubce/bce-sdk-go/bce"
 	"github.com/baidubce/bce-sdk-go/services/bos"
 	"github.com/baidubce/bce-sdk-go/services/bos/api"
@@ -21,17 +20,19 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-// ObjectStorage interface
-type StorageHandler interface {
+// IObjectStorage interface
+type IObjectStorage interface {
 	PutObjectFromFile(Bucket, remotePath, filename string, meta map[string]string) error
-	FileExists(Bucket, remotePath, md5 string) (bool, error)
+	FileExists(Bucket, remotePath, md5 string) bool
 }
 
 // NewObjectStorageHandler NewObjectStorageHandler
-func NewObjectStorageHandler(cfg ClientInfo) (StorageHandler, error) {
+func NewObjectStorageHandler(cfg ClientInfo) (IObjectStorage, error) {
 	switch cfg.Kind {
 	case Bos:
 		return NewBosHandler(cfg)
+	case Ceph:
+		return NewCephClient(cfg)
 	case S3:
 		return NewS3Client(cfg)
 	default:
@@ -46,17 +47,17 @@ type BosHandler struct {
 }
 
 // NewBosHandler creates a new newBosClient
-func NewBosHandler(cfg ClientInfo) (StorageHandler, error) {
-	cli, err := bos.NewClient(cfg.Ak, cfg.Sk, cfg.Endpoint)
+func NewBosHandler(cfg ClientInfo) (*BosHandler, error) {
+	bos, err := bos.NewClient(cfg.Ak, cfg.Sk, cfg.Endpoint)
 	if err != nil {
-		return nil, errors.Errorf("failed to create bos client (%s): %s", cfg.Name, err.Error())
+		return nil, fmt.Errorf("failed to create bos client (%s): %s", cfg.Name, err.Error())
 	}
-	cli.MultipartSize = cfg.MultiPart.PartSize
-	cli.MaxParallel = (int64)(cfg.MultiPart.Concurrency)
-	cli.Config.ConnectionTimeoutInMillis = (int)(cfg.Timeout / time.Millisecond)
-	cli.Config.Retry = bce.NewBackOffRetryPolicy(cfg.Backoff.Max, (int64)(cfg.Backoff.Delay/time.Millisecond), (int64)(cfg.Backoff.Base/time.Millisecond))
+	bos.MultipartSize = int64(cfg.MultiPart.PartSize)
+	bos.MaxParallel = int64(cfg.MultiPart.Concurrency)
+	bos.Config.ConnectionTimeoutInMillis = (int)(cfg.Timeout / time.Millisecond)
+	bos.Config.Retry = bce.NewBackOffRetryPolicy(cfg.Backoff.Max, (int64)(cfg.Backoff.Delay/time.Millisecond), (int64)(cfg.Backoff.Base/time.Millisecond))
 	b := &BosHandler{
-		bos: cli,
+		bos: bos,
 		cfg: cfg,
 	}
 	return b, nil
@@ -67,19 +68,18 @@ func (cli *BosHandler) PutObjectFromFile(Bucket, remotePath, filename string, me
 	args := new(api.PutObjectArgs)
 	args.UserMeta = meta
 	_, err := cli.bos.PutObjectFromFile(Bucket, remotePath, filename, args)
-	return errors.Trace(err)
+	return err
 }
 
 // FileExists FileExists
-func (cli *BosHandler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
-	res, err := cli.bos.GetObjectMeta(Bucket, remotePath)
-	if err != nil {
-		return false, errors.Trace(err)
+func (cli *BosHandler) FileExists(Bucket, remotePath, md5 string) bool {
+	res, _ := cli.bos.GetObjectMeta(Bucket, remotePath)
+	if res != nil {
+		if res.ObjectMeta.ContentMD5 == md5 {
+			return true
+		}
 	}
-	if res.ObjectMeta.ContentMD5 == md5 {
-		return true, nil
-	}
-	return false, nil
+	return false
 }
 
 // S3Handler S3Handler
@@ -89,24 +89,43 @@ type S3Handler struct {
 	cfg      ClientInfo
 }
 
-// NewS3Client creates a new NewS3Client
-func NewS3Client(cfg ClientInfo) (StorageHandler, error) {
+// NewCephClient creates a new NewCephClient
+func NewCephClient(cfg ClientInfo) (*S3Handler, error) {
+	// Configure to use S3 Server
 	s3Config := &aws.Config{
 		Credentials:      credentials.NewStaticCredentials(cfg.Ak, cfg.Sk, ""),
 		Endpoint:         aws.String(cfg.Endpoint),
-		Region:           aws.String(cfg.Region),
+		Region:           aws.String("us-east-1"),
 		DisableSSL:       aws.Bool(!strings.HasPrefix(cfg.Endpoint, "https")),
 		S3ForcePathStyle: aws.Bool(true),
 	}
-	sessionProvider, err := session.NewSession(s3Config)
-	if err != nil {
-		return nil, errors.Trace(err)
-	}
-	return &S3Handler{
-		s3Client: s3.New(sessionProvider),
+	newSession := session.New(s3Config)
+	s3Client := s3.New(newSession)
+	uploader := s3manager.NewUploader(newSession)
+	c := &S3Handler{
+		s3Client: s3Client,
 		cfg:      cfg,
-		uploader: s3manager.NewUploader(sessionProvider),
-	}, nil
+		uploader: uploader,
+	}
+	return c, nil
+}
+
+// NewS3Client creates a new NewS3Client
+func NewS3Client(cfg ClientInfo) (*S3Handler, error) {
+	// Configure to use S3 Server
+	s3Config := &aws.Config{
+		Credentials: credentials.NewStaticCredentials(cfg.Ak, cfg.Sk, ""),
+		Region:      aws.String(cfg.Region),
+	}
+	newSession := session.New(s3Config)
+	s3Client := s3.New(newSession)
+	uploader := s3manager.NewUploader(newSession)
+	c := &S3Handler{
+		s3Client: s3Client,
+		cfg:      cfg,
+		uploader: uploader,
+	}
+	return c, nil
 }
 
 // PutObjectFromFile upload file
@@ -116,10 +135,10 @@ func (cli *S3Handler) PutObjectFromFile(Bucket, remotePath, filename string, met
 		Metadata[k] = &v
 	}
 	f, err := os.Open(filename)
-	if err != nil {
-		return errors.Trace(err)
-	}
 	defer f.Close()
+	if err != nil {
+		return err
+	}
 	params := &s3manager.UploadInput{
 		Bucket:   aws.String(Bucket),     // Required
 		Key:      aws.String(remotePath), // Required
@@ -128,28 +147,30 @@ func (cli *S3Handler) PutObjectFromFile(Bucket, remotePath, filename string, met
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cli.cfg.Timeout)
 	defer cancel()
+
 	_, err = cli.uploader.UploadWithContext(ctx, params, func(u *s3manager.Uploader) {
-		u.PartSize = cli.cfg.MultiPart.PartSize
+		u.PartSize = int64(cli.cfg.MultiPart.PartSize)
 		u.LeavePartsOnError = true
 		u.Concurrency = cli.cfg.MultiPart.Concurrency
-	}) //并发数
-	return errors.Trace(err)
+	})
+
+	return err
 }
 
 // FileExists FileExists
-func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
+func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) bool {
 	cparams := &s3.HeadObjectInput{
 		Bucket: aws.String(Bucket),
 		Key:    aws.String(remotePath),
 	}
 	ho, err := cli.s3Client.HeadObject(cparams)
 	if err != nil {
-		return false, errors.Trace(err)
+		return false
 	}
 	input, _ := hex.DecodeString(strings.Replace(*ho.ETag, "\"", "", -1))
 	encodeString := base64.StdEncoding.EncodeToString(input)
-	if encodeString == md5 {
-		return true, nil
+	if encodeString != md5 {
+		return false
 	}
-	return false, nil
+	return true
 }
