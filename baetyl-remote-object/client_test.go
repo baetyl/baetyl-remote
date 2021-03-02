@@ -148,16 +148,14 @@ func TestUpload(t *testing.T) {
 
 	// round 1: local file is not exist
 	err = storageClient.upload("var/test/file", "default", map[string]string{})
-	assert.NotNil(t, err)
-	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error())
+	assert.Error(t, err, "open var/test/file: no such file or directory")
 
 	// round 2: file exists without limit data
 	storageClient.cfg.Bucket = "Bucket"
 	storageClient.cfg.MultiPart.PartSize = 1048576000
 	storageClient.cfg.MultiPart.Concurrency = 10
 	err = storageClient.upload("./example/etc/baetyl/service-bos.yml", "var/file/service.yml", map[string]string{})
-	assert.NotNil(t, err)
-	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
+	assert.Error(t, err)
 
 	// round 3: file exists with limit data
 	storageClient.cfg.Limit.Enable = true
@@ -169,8 +167,7 @@ func TestUpload(t *testing.T) {
 			Count: 20,
 		}}
 	err = storageClient.upload("./example/test/baetyl/service.yml", "var/file/service.yml", map[string]string{})
-	assert.NotNil(t, err)
-	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
+	assert.Error(t, err)
 }
 
 func TestHandleUploadEvent(t *testing.T) {
@@ -215,8 +212,7 @@ func TestHandleUploadEvent(t *testing.T) {
 	storageClient.cfg.MultiPart.PartSize = 1048576000
 	storageClient.cfg.MultiPart.Concurrency = 10
 	err = storageClient.handleUploadEvent(e)
-	assert.NotNil(t, err)
-	assert.Equal(t, "EmptyStaticCreds: static credentials are empty", err.Error()) // without AccessKey and SecretKey
+	assert.Error(t, err)
 
 	// zip is true, upload file
 	e.Zip = true
@@ -266,9 +262,8 @@ func TestCheckFile(t *testing.T) {
 	remotePath := "var/file/service.yml"
 	md5 := "4a0fb0ea68b05a84234e420d1f8cb32b"
 
-	rlt, err := storageClient.checkFile(remotePath, md5)
-	assert.Equal(t, err.Error(), "EmptyStaticCreds: static credentials are empty")
-	assert.Equal(t, false, rlt)
+	rlt := storageClient.handler.FileExists(storageClient.cfg.Bucket, remotePath, md5)
+	assert.False(t, rlt)
 }
 
 func TestCheckData(t *testing.T) {

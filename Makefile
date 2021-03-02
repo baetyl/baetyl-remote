@@ -1,4 +1,4 @@
-MODULES?=kafka
+MODULES?=object
 PLATFORM_ALL:=linux/amd64 linux/arm64 linux/386 linux/arm/v7
 
 GO_TEST_FLAGS?=

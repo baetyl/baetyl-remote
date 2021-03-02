@@ -4,8 +4,7 @@
 *.dll
 *.so
 *.dylib
-/.idea
-/.vscode
+/**/.vscode
 /**/coverage.*
 /**/.DS_Store
 /**/*.log
@@ -21,7 +20,7 @@
 *.a
 *.jar
 *.iml
-/.idea
+/**/.idea
 /.vscode
 /output*
 /**/*.zip
@@ -39,6 +38,4 @@
 /**/node_modules
 /**/__package
 docs/_build
-baetyl-remote-object
-/**/baetyl-remote-object
 /**/output/

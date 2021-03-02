@@ -5,13 +5,17 @@ import (
 	"sync"
 
 	"github.com/256dpi/gomqtt/packet"
+	"github.com/baetyl/baetyl-go/v2/context"
 	"github.com/baetyl/baetyl-go/v2/errors"
 	"github.com/baetyl/baetyl-go/v2/log"
 	"github.com/baetyl/baetyl-go/v2/mqtt"
+	"github.com/baetyl/baetyl-go/v2/utils"
 )
 
 // Ruler struct
 type Ruler struct {
+	ctx       context.Context
+	info      RuleInfo
 	sourceCli *mqtt.Client
 	targetCli *Client
 	log       *log.Logger
@@ -19,19 +23,24 @@ type Ruler struct {
 }
 
 // NewRuler can create a ruler
-func NewRuler(rule RuleInfo, targets map[string]*Client, serviceName string) (*Ruler, error) {
+func NewRuler(ctx context.Context, rule RuleInfo, targets map[string]*Client) (*Ruler, error) {
 	targetCli, ok := targets[rule.Target.Client]
 	if !ok {
 		return nil, errors.Errorf("client (%s) not found", rule.Target.Client)
 	}
 
-	mqttCli := getBrokerClient(rule.Source.QOS, rule.Source.Topic, fmt.Sprintf("%s-rule-%s", serviceName, rule.Name))
 	ruler := &Ruler{
-		sourceCli: mqttCli,
+		ctx:       ctx,
+		info:      rule,
 		targetCli: targetCli,
 		log:       log.With(log.Any("rule", rule.Name)),
 	}
-	err := mqttCli.Start(mqtt.NewObserverWrapper(func(pkt *packet.Publish) error {
+	mqttCli, err := ruler.getBrokerClient()
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	ruler.sourceCli = mqttCli
+	err = mqttCli.Start(mqtt.NewObserverWrapper(func(pkt *packet.Publish) error {
 		event, err := ruler.processEvent(pkt)
 		if err != nil {
 			ruler.log.Error("error occurred in ruler.processEvent", log.Error(err))
@@ -108,16 +117,22 @@ func (r *Ruler) callback(msg *EventMessage, err error) {
 	}
 }
 
-func getBrokerClient(qos uint32, topic, clientID string) *mqtt.Client {
+func (r *Ruler) getBrokerClient() (*mqtt.Client, error) {
 	mqttCfg := mqtt.NewClientOptions()
-	mqttCfg.ClientID = clientID
-	mqttCfg.Address = "tcp://baetyl-broker:1883"
+	mqttCfg.ClientID = fmt.Sprintf("%s-rule-%s", r.ctx.ServiceName(), r.info.Name)
+	mqttCfg.Address = fmt.Sprintf("%s://%s:%s", "ssl", context.BrokerHost(), context.BrokerPort())
+	tls, err := utils.NewTLSConfigClient(r.ctx.SystemConfig().Certificate)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	mqttCfg.TLSConfig = tls
 	mqttCfg.CleanSession = false
 	mqttCfg.Subscriptions = []mqtt.Subscription{
 		{
-			QOS:   mqtt.QOS(qos),
-			Topic: topic,
+			QOS:   mqtt.QOS(r.info.Source.QOS),
+			Topic: r.info.Source.Topic,
 		},
 	}
-	return mqtt.NewClient(mqttCfg)
+	log.L().Debug("getBrokerClient", log.Any("mqtt client config", mqttCfg))
+	return mqtt.NewClient(mqttCfg), nil
 }

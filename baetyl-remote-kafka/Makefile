@@ -5,7 +5,7 @@ MODULE:=baetyl-remote-kafka
 SRC_FILES:=$(shell find . -type f -name '*.go')
 BIN_FILE:=baetyl-remote-kafka
 BIN_CMD=$(shell echo $(@:$(OUTPUT)/%/$(MODULE)/bin/$(BIN_FILE)=%)  | sed 's:/v:/:g' | awk -F '/' '{print "CGO_ENABLED=0 GOOS="$$1" GOARCH="$$2" GOARM="$$3" go build"}') -o $@ ${GO_FLAGS} .
-COPY_DIR:=../output
+COPY_DIR:=output
 PLATFORM_ALL:=darwin/amd64 linux/amd64 linux/arm64 linux/386 linux/arm/v7
 
 
@@ -33,7 +33,7 @@ XPLATFORMS:=$(shell echo $(filter-out darwin/amd64,$(PLATFORMS)) | sed 's: :,:g'
 
 YML_FILE=$(wildcard *.yml)
 
-OUTPUT:=../output
+OUTPUT:=output
 OUTPUT_MODS:=$(PLATFORMS:%=$(OUTPUT)/%/$(MODULE))
 OUTPUT_BINS:=$(OUTPUT_MODS:%=%/bin/$(BIN_FILE))
 OUTPUT_PKGS:=$(OUTPUT_MODS:%=%/$(MODULE)-$(VERSION).zip) # TODO: switch to tar

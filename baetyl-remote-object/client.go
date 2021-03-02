@@ -143,11 +143,7 @@ func (cli *Client) call(task interface{}) {
 // upload upload object to service(BOS, CEPH or AWS S3)
 func (cli *Client) upload(f, remotePath string, meta map[string]string) error {
 	fsize, md5 := cli.fileSizeMd5(f)
-	saved, err := cli.checkFile(remotePath, md5)
-	if err != nil {
-		return errors.Trace(err)
-	}
-	if saved {
+	if cli.handler.FileExists(cli.cfg.Bucket, remotePath, md5) {
 		return nil
 	}
 	if cli.cfg.Limit.Enable {
@@ -163,7 +159,7 @@ func (cli *Client) upload(f, remotePath string, meta map[string]string) error {
 		}
 		return cli.increaseData(fsize, month)
 	}
-	err = cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
+	err := cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
 	if err != nil {
 		return errors.Trace(err)
 	}
@@ -234,14 +230,6 @@ func (cli *Client) handleUploadEvent(e *UploadEvent) error {
 	}
 
 	return cli.upload(t, e.RemotePath, e.Meta)
-}
-
-func (cli *Client) checkFile(remotePath, md5 string) (bool, error) {
-	res, err := cli.handler.FileExists(cli.cfg.Bucket, remotePath, md5)
-	if err != nil {
-		return false, errors.Trace(err)
-	}
-	return res, nil
 }
 
 func (cli *Client) fileSizeMd5(f string) (int64, string) {
