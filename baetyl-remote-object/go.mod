@@ -3,9 +3,9 @@ module github.com/baetyl/baetyl-remote
 go 1.13
 
 require (
-	github.com/256dpi/gomqtt v0.14.2
+	github.com/256dpi/gomqtt v0.14.3
 	github.com/aws/aws-sdk-go v1.32.8
-	github.com/baetyl/baetyl-go/v2 v2.0.61
+	github.com/baetyl/baetyl-go/v2 v2.1.31
 	github.com/baidubce/bce-sdk-go v0.9.5
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/go-units v0.4.0

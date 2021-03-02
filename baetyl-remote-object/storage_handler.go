@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/baetyl/baetyl-go/v2/errors"
+	"github.com/baetyl/baetyl-go/v2/log"
 	"github.com/baidubce/bce-sdk-go/bce"
 	"github.com/baidubce/bce-sdk-go/services/bos"
 	"github.com/baidubce/bce-sdk-go/services/bos/api"
@@ -43,6 +44,7 @@ func NewObjectStorageHandler(cfg ClientInfo) (StorageHandler, error) {
 type BosHandler struct {
 	bos *bos.Client
 	cfg ClientInfo
+	log *log.Logger
 }
 
 // NewBosHandler creates a new newBosClient
@@ -58,6 +60,7 @@ func NewBosHandler(cfg ClientInfo) (StorageHandler, error) {
 	b := &BosHandler{
 		bos: cli,
 		cfg: cfg,
+		log: log.With(log.Any("storage", "bos")),
 	}
 	return b, nil
 }
@@ -74,7 +77,8 @@ func (cli *BosHandler) PutObjectFromFile(Bucket, remotePath, filename string, me
 func (cli *BosHandler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
 	res, err := cli.bos.GetObjectMeta(Bucket, remotePath)
 	if err != nil {
-		return false, errors.Trace(err)
+		cli.log.Warn("failed to get object meta", log.Error(err))
+		return false, nil
 	}
 	if res.ObjectMeta.ContentMD5 == md5 {
 		return true, nil
@@ -87,6 +91,7 @@ type S3Handler struct {
 	s3Client *s3.S3
 	uploader *s3manager.Uploader
 	cfg      ClientInfo
+	log      *log.Logger
 }
 
 // NewS3Client creates a new NewS3Client
@@ -106,6 +111,7 @@ func NewS3Client(cfg ClientInfo) (StorageHandler, error) {
 		s3Client: s3.New(sessionProvider),
 		cfg:      cfg,
 		uploader: s3manager.NewUploader(sessionProvider),
+		log:      log.With(log.Any("storage", "s3")),
 	}, nil
 }
 
@@ -144,7 +150,8 @@ func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
 	}
 	ho, err := cli.s3Client.HeadObject(cparams)
 	if err != nil {
-		return false, errors.Trace(err)
+		cli.log.Warn("failed to get object meta", log.Error(err))
+		return false, nil
 	}
 	input, _ := hex.DecodeString(strings.Replace(*ho.ETag, "\"", "", -1))
 	encodeString := base64.StdEncoding.EncodeToString(input)
