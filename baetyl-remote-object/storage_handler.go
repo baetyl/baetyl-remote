@@ -150,8 +150,7 @@ func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
 	}
 	ho, err := cli.s3Client.HeadObject(cparams)
 	if err != nil {
-		cli.log.Warn("failed to get object meta", log.Error(err))
-		return false, nil
+		return false, errors.Trace(err)
 	}
 	input, _ := hex.DecodeString(strings.Replace(*ho.ETag, "\"", "", -1))
 	encodeString := base64.StdEncoding.EncodeToString(input)
