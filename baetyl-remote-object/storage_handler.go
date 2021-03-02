@@ -25,7 +25,7 @@ import (
 // ObjectStorage interface
 type StorageHandler interface {
 	PutObjectFromFile(Bucket, remotePath, filename string, meta map[string]string) error
-	FileExists(Bucket, remotePath, md5 string) (bool, error)
+	FileExists(Bucket, remotePath, md5 string) bool
 }
 
 // NewObjectStorageHandler NewObjectStorageHandler
@@ -74,16 +74,16 @@ func (cli *BosHandler) PutObjectFromFile(Bucket, remotePath, filename string, me
 }
 
 // FileExists FileExists
-func (cli *BosHandler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
+func (cli *BosHandler) FileExists(Bucket, remotePath, md5 string) bool {
 	res, err := cli.bos.GetObjectMeta(Bucket, remotePath)
 	if err != nil {
 		cli.log.Warn("failed to get object meta", log.Error(err))
-		return false, nil
+		return false
 	}
 	if res.ObjectMeta.ContentMD5 == md5 {
-		return true, nil
+		return true
 	}
-	return false, nil
+	return false
 }
 
 // S3Handler S3Handler
@@ -143,19 +143,20 @@ func (cli *S3Handler) PutObjectFromFile(Bucket, remotePath, filename string, met
 }
 
 // FileExists FileExists
-func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) (bool, error) {
+func (cli *S3Handler) FileExists(Bucket, remotePath, md5 string) bool {
 	cparams := &s3.HeadObjectInput{
 		Bucket: aws.String(Bucket),
 		Key:    aws.String(remotePath),
 	}
 	ho, err := cli.s3Client.HeadObject(cparams)
 	if err != nil {
-		return false, errors.Trace(err)
+		cli.log.Warn("failed to get object meta", log.Error(err))
+		return false
 	}
 	input, _ := hex.DecodeString(strings.Replace(*ho.ETag, "\"", "", -1))
 	encodeString := base64.StdEncoding.EncodeToString(input)
 	if encodeString == md5 {
-		return true, nil
+		return true
 	}
-	return false, nil
+	return false
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/awstesting/unit"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/baetyl/baetyl-go/v2/log"
 	"github.com/baetyl/baetyl-go/v2/utils"
 	"github.com/docker/distribution/uuid"
 	"github.com/stretchr/testify/assert"
@@ -62,6 +63,7 @@ func TestPutObjectFromFile(t *testing.T) {
 		s3Client: &s3.S3{sc},
 		uploader: up,
 		cfg:      *cfg,
+		log:      log.L().With(log.Any("test", "s3")),
 	}
 	err := s3Handler.PutObjectFromFile("Bucket", "Key", "./example/etc/baetyl/service-s3.yml", map[string]string{"name": "hahaha", "location": "Beijing"})
 	assert.NotNil(t, err)
@@ -75,9 +77,10 @@ func TestFileExists(t *testing.T) {
 		s3Client: &s3.S3{sc},
 		uploader: u,
 		cfg:      *cfg,
+		log:      log.L().With(log.Any("test", "s3")),
 	}
 	md5, err := utils.CalculateFileMD5("example/etc/baetyl/service-bos.yml")
 	assert.Nil(t, err)
-	_, err = s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
-	assert.Equal(t, err.Error(), "MissingRegion: could not find region configuration")
+	res := s3Handler.FileExists("Bucket", "var/file/service.yml", md5)
+	assert.False(t, res)
 }
