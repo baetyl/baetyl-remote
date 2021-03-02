@@ -8,8 +8,8 @@ go:
 install: true
 script:
   - echo "baetyl-remote build begin"
-  - env GO111MODULE=on make
+  - env GO111MODULE=on GOPROXY=https://goproxy.io make
   - echo "baetyl-remote build end"
   - echo "baetyl uint test begin"
-  - env GO111MODULE=on make test GOTESTFLAG=--race
+  - env GO111MODULE=on GOPROXY=https://goproxy.io make test GOTESTFLAG=--race
   - echo "baetyl unit test end"
