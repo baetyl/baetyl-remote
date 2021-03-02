@@ -9,7 +9,12 @@ replace (
 
 require (
 	github.com/256dpi/gomqtt v0.12.2
+	github.com/Microsoft/go-winio v0.4.15 // indirect
+	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/baetyl/baetyl v0.0.0-20191029040747-94cee1e78d62
+	github.com/frankban/quicktest v1.11.2 // indirect
+	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/segmentio/kafka-go v0.3.4
-	golang.org/x/tools v0.0.0-20190524140312-2c0ae7006135
+	github.com/shirou/w32 v0.0.0-20160930032740-bb4de0191aa4 // indirect
+	gotest.tools v2.2.0+incompatible // indirect
 )
