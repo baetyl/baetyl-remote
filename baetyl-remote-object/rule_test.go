@@ -2,7 +2,6 @@ package main
 
 import (
 	"io/ioutil"
-	"os"
 	"path"
 	"testing"
 	"time"
@@ -58,8 +57,8 @@ uTyXHsnBXFPPo6m/tcqHvIOSek9JIurtAg==
 )
 
 func prepareCert(t *testing.T) string {
-	tmpDir, err := ioutil.TempDir("", "init")
-	assert.Nil(t, err)
+	var err error
+	tmpDir := t.TempDir()
 	crt := path.Join(tmpDir, "crt.pem")
 	err = ioutil.WriteFile(crt, []byte(crtPem), 0755)
 	assert.Nil(t, err)
@@ -88,20 +87,22 @@ func TestRule(t *testing.T) {
 			Topic: "t1",
 		},
 		Target: struct {
-			Client string `yaml:"client" json:"client" default:"baetyl-broker"`
+			Client string `yaml:"client" json:"client" default:"baetyl-sts"`
 		}{
 			Client: "cli1",
 		},
 	}
 
 	dir := prepareCert(t)
-	defer os.RemoveAll(dir)
 	conf, err := ioutil.TempFile(dir, "conf.yml")
 	assert.NoError(t, err)
 	ctx := context.NewContext(conf.Name())
 	ctx.SystemConfig().Certificate.CA = path.Join(dir, "ca.pem")
 	ctx.SystemConfig().Certificate.Cert = path.Join(dir, "crt.pem")
 	ctx.SystemConfig().Certificate.Key = path.Join(dir, "key.pem")
+	ctx.SystemConfig().Broker.CA = path.Join(dir, "ca.pem")
+	ctx.SystemConfig().Broker.Cert = path.Join(dir, "crt.pem")
+	ctx.SystemConfig().Broker.Key = path.Join(dir, "key.pem")
 
 	ruler, err := NewRuler(ctx, ruleInfo, clients)
 	assert.NoError(t, err)

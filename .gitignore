@@ -9,6 +9,8 @@
 /**/.DS_Store
 /**/*.log
 /vendor
+etc/
+var/
 # Test binary, build with `go test -c`
 *.test
 
