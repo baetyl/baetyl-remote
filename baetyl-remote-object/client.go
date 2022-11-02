@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/baetyl/baetyl-go/v2/context"
 	"github.com/baetyl/baetyl-go/v2/errors"
 	"github.com/baetyl/baetyl-go/v2/log"
 	"github.com/baetyl/baetyl-go/v2/utils"
@@ -49,12 +50,12 @@ type Client struct {
 }
 
 // NewClient creates a new object client
-func NewClient(cfg ClientInfo) (*Client, error) {
+func NewClient(ctx context.Context, cfg ClientInfo) (*Client, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
-	handler, err := NewObjectStorageHandler(cfg)
+	handler, err := NewObjectStorageHandler(ctx, cfg)
 	if err != nil {
 		return nil, errors.Trace(err)
 	}
@@ -142,13 +143,27 @@ func (cli *Client) call(task interface{}) {
 
 // upload upload object to service(BOS, CEPH or AWS S3)
 func (cli *Client) upload(f, remotePath string, meta map[string]string) error {
+	res, err := cli.handler.RefreshSts()
+	if err != nil {
+		return errors.Trace(err)
+	}
+	if cli.cfg.Name == MinioStsCli {
+		cli.cfg.DefaultPath = res.Namespace + "/" + res.NodeName
+		cli.cfg.StsDeadline = res.Expiration
+		cli.cfg.Bucket = res.Bucket
+		cli.cfg.Ak = res.AK
+		cli.cfg.Sk = res.SK
+		cli.cfg.Endpoint = res.Endpoint
+		cli.cfg.Token = res.Token
+		remotePath = cli.cfg.DefaultPath + "/" + remotePath
+	}
 	fsize, md5 := cli.fileSizeMd5(f)
 	if cli.handler.FileExists(cli.cfg.Bucket, remotePath, md5) {
 		return nil
 	}
 	if cli.cfg.Limit.Enable {
 		month := time.Unix(0, time.Now().UnixNano()).Format("2006-01")
-		err := cli.checkData(fsize, month)
+		err = cli.checkData(fsize, month)
 		if err != nil {
 			atomic.AddUint64(&cli.fs.limit, 1)
 			return errors.Errorf("failed to pass data check: %s", err.Error())
@@ -159,7 +174,7 @@ func (cli *Client) upload(f, remotePath string, meta map[string]string) error {
 		}
 		return cli.increaseData(fsize, month)
 	}
-	err := cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
+	err = cli.putObjectWithStats(cli.cfg.Bucket, remotePath, f, meta)
 	if err != nil {
 		return errors.Trace(err)
 	}

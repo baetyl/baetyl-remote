@@ -1,7 +1,12 @@
 package main
 
 import (
+	"time"
+
 	"github.com/baetyl/baetyl-go/v2/context"
+	"github.com/baetyl/baetyl-go/v2/errors"
+	"github.com/baetyl/baetyl-go/v2/log"
+	"github.com/baetyl/baetyl-go/v2/utils"
 )
 
 func main() {
@@ -10,6 +15,10 @@ func main() {
 		err := ctx.LoadCustomConfig(&cfg)
 		if err != nil {
 			return err
+		}
+		err = AddDefaultCfg(&cfg)
+		if err != nil {
+			log.L().Warn("failed to init default ipc", log.Error(err))
 		}
 
 		// clients
@@ -20,7 +29,7 @@ func main() {
 			}
 		}()
 		for _, c := range cfg.Clients {
-			client, err := NewClient(c)
+			client, err := NewClient(ctx, c)
 			if err != nil {
 				return err
 			}
@@ -44,4 +53,30 @@ func main() {
 		ctx.Wait()
 		return nil
 	})
+}
+
+func AddDefaultCfg(cfg *Config) error {
+	cliInfo := ClientInfo{
+		Name:         MinioStsCli,
+		Kind:         S3,
+		ObjectConfig: ObjectConfig{},
+		DefaultPath:  "",
+		StsDeadline:  time.Now(),
+	}
+	err := utils.SetDefaults(&cliInfo)
+	if err != nil {
+		return errors.Trace(err)
+	}
+	cfg.Clients = append(cfg.Clients, cliInfo)
+	cfg.Rules = append(cfg.Rules, RuleInfo{
+		Name: IpcRule,
+		Source: struct {
+			QOS   uint32 `yaml:"qos" json:"qos" validate:"min=0, max=1"`
+			Topic string `yaml:"topic" json:"topic" validate:"nonzero"`
+		}{QOS: 0, Topic: BaetylIpcTopic},
+		Target: struct {
+			Client string `yaml:"client" json:"client" default:"baetyl-sts"`
+		}{Client: MinioStsCli},
+	})
+	return nil
 }

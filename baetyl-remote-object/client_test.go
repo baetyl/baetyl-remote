@@ -7,13 +7,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/baetyl/baetyl-go/v2/context"
 	"github.com/stretchr/testify/assert"
 )
 
-func newClient() (*Client, error) {
+func newClient(t *testing.T) (*Client, error) {
 	cfg.Kind = "S3"
 	cfg.Region = "us-east-1"
-	storageClient, err := NewClient(*cfg)
+	dir := prepareCert(t)
+	conf, err := ioutil.TempFile(dir, "conf.yml")
+	assert.NoError(t, err)
+	ctx := context.NewContext(conf.Name())
+	ctx.SystemConfig().Certificate.CA = path.Join(dir, "ca.pem")
+	ctx.SystemConfig().Certificate.Cert = path.Join(dir, "crt.pem")
+	ctx.SystemConfig().Certificate.Key = path.Join(dir, "key.pem")
+	ctx.SystemConfig().Core.CA = path.Join(dir, "ca.pem")
+	ctx.SystemConfig().Core.Cert = path.Join(dir, "crt.pem")
+	ctx.SystemConfig().Core.Key = path.Join(dir, "key.pem")
+	storageClient, err := NewClient(ctx, *cfg)
 	return storageClient, err
 }
 
@@ -32,7 +43,7 @@ func generateTempPath(prefix string) (string, error) {
 
 func TestNewStorageClient(t *testing.T) {
 	// round 1: report is not nil
-	_, err := newClient()
+	_, err := newClient(t)
 	assert.Equal(t, err.Error(), "failed to make dir (): mkdir : no such file or directory")
 }
 
@@ -56,7 +67,7 @@ func TestCallAsync(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -97,7 +108,7 @@ func TestCall(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -142,7 +153,7 @@ func TestUpload(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -189,7 +200,7 @@ func TestHandleUploadEvent(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -255,7 +266,7 @@ func TestCheckFile(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -289,7 +300,7 @@ func TestCheckData(t *testing.T) {
 	cfg.Limit.Path = "var/lib/baetyl/data/stats.yml"
 
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.Nil(t, err)
 	defer storageClient.Close()
 
@@ -330,7 +341,7 @@ func TestStartAndClose(t *testing.T) {
 	cfg.Pool.Idletime = time.Duration(30000000000)
 
 	// create storage client
-	_, err = newClient()
+	_, err = newClient(t)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "failed to make dir (/usr/data.yml)")
 
@@ -341,7 +352,7 @@ func TestStartAndClose(t *testing.T) {
 	cfg.TempPath = dir
 	cfg.Limit.Path = "/var/file/service.yml"
 	// create storage client
-	_, err = newClient()
+	_, err = newClient(t)
 	assert.NotNil(t, err)
 	assert.Contains(t, err.Error(), "failed to make dir (/var/file)")
 
@@ -351,7 +362,7 @@ func TestStartAndClose(t *testing.T) {
 	tmpfile, err := ioutil.TempFile(dir, "test")
 	cfg.Limit.Path = tmpfile.Name() + ".yml"
 	// create storage client
-	_, err = newClient()
+	_, err = newClient(t)
 	assert.NotNil(t, err)
 	assert.Equal(t, "failed to create a pool: invalid size for pool", err.Error())
 
@@ -359,7 +370,7 @@ func TestStartAndClose(t *testing.T) {
 	cfg.Pool.Worker = 10
 	cfg.Pool.Idletime = time.Duration(30000000000)
 	// create storage client
-	storageClient, err := newClient()
+	storageClient, err := newClient(t)
 	assert.NoError(t, err)
 
 	err = storageClient.Close()

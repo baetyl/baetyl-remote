@@ -16,6 +16,10 @@ type Kind string
 const (
 	Bos Kind = "BOS"
 	S3  Kind = "S3"
+
+	MinioStsCli    = "baetyl-sts"
+	IpcRule        = "baetyl-ipc"
+	BaetylIpcTopic = "$baetyl/device/+/result"
 )
 
 // Config config of rule
@@ -35,6 +39,8 @@ type ClientInfo struct {
 	Pool         Pool          `yaml:"pool" json:"pool"`
 	MultiPart    MultiPart     `yaml:"multipart" json:"multipart"`
 	Limit        Limit         `yaml:"limit" json:"limit"`
+	StsDeadline  time.Time     `yaml:"StsDeadline" json:"StsDeadline"`
+	DefaultPath  string        `yaml:"defaultPath" json:"defaultPath"`
 	Record       struct {
 		Interval time.Duration `yaml:"interval" json:"interval" default:"1m"`
 	} `yaml:"record" json:"record"`
@@ -47,6 +53,7 @@ type ObjectConfig struct {
 	Ak       string `yaml:"ak" json:"ak" validate:"nonzero"`
 	Sk       string `yaml:"sk" json:"sk" validate:"nonzero"`
 	Bucket   string `yaml:"bucket" json:"bucket" validate:"nonzero"`
+	Token    string `yaml:"token,omitempty" json:"token,omitempty" default:""`
 }
 
 // RuleInfo rule info
@@ -57,7 +64,7 @@ type RuleInfo struct {
 		Topic string `yaml:"topic" json:"topic" validate:"nonzero"`
 	} `yaml:"source" json:"source" validate:"nonzero"`
 	Target struct {
-		Client string `yaml:"client" json:"client" default:"baetyl-broker"`
+		Client string `yaml:"client" json:"client" default:"baetyl-sts"`
 	} `yaml:"target" json:"target"`
 }
 
