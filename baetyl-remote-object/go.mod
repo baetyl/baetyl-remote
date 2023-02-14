@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/256dpi/gomqtt v0.14.3
-	github.com/aws/aws-sdk-go v1.32.8
+	github.com/aws/aws-sdk-go v1.34.0
 	github.com/baetyl/baetyl-go/v2 v2.2.4-0.20221025062732-b71f379df3ba
 	github.com/baidubce/bce-sdk-go v0.9.5
 	github.com/docker/distribution v2.7.1+incompatible
